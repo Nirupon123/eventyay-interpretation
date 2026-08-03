@@ -1,14 +1,14 @@
-"""Tests for InterpretationSettingsForm validation and connect flow."""
+"""Tests for InterpretationSettingsForm and RoomInterpretationForm."""
 
 from interpretation.forms import (
     CONNECT_POST_KEY,
     InterpretationSettingsForm,
     RoomInterpretationForm,
 )
+from interpretation.models import RoomInterpretation
 from interpretation.settings import (
     SETTING_AUTH_TOKEN,
     SETTING_BASE_URL,
-    SETTING_IS_ENABLED,
     SETTING_SUSI_EMAIL,
 )
 
@@ -18,7 +18,6 @@ PUBLIC_URL = "https://example.com"
 _SETTING_TYPES = {
     SETTING_BASE_URL: str,
     SETTING_AUTH_TOKEN: str,
-    SETTING_IS_ENABLED: bool,
 }
 
 
@@ -71,36 +70,9 @@ def _form(data, settings=None, prefix="interpretation"):
 
 
 def test_base_url_trailing_slash_is_stripped():
-    form = _form(
-        {
-            SETTING_BASE_URL: f"{PUBLIC_URL}/",
-            SETTING_IS_ENABLED: False,
-        }
-    )
+    form = _form({SETTING_BASE_URL: f"{PUBLIC_URL}/"})
     assert form.is_valid(), form.errors
     assert form.cleaned_data[SETTING_BASE_URL] == PUBLIC_URL
-
-
-def test_enabling_without_connection_is_rejected():
-    form = _form(
-        {
-            SETTING_BASE_URL: PUBLIC_URL,
-            SETTING_IS_ENABLED: True,
-        }
-    )
-    assert not form.is_valid()
-    assert SETTING_IS_ENABLED in form.errors
-
-
-def test_enabling_with_existing_token_is_accepted():
-    form = _form(
-        {
-            SETTING_BASE_URL: PUBLIC_URL,
-            SETTING_IS_ENABLED: True,
-        },
-        settings={SETTING_AUTH_TOKEN: "stored-token"},
-    )
-    assert form.is_valid(), form.errors
 
 
 def test_connect_requires_email_and_password():
@@ -147,7 +119,7 @@ def test_connect_with_credentials_is_valid(monkeypatch):
     assert form.obj.settings.get(SETTING_SUSI_EMAIL) == "bot@example.com"
 
 
-def test_failed_connect_does_not_enable_interpretation(monkeypatch):
+def test_failed_connect_does_not_store_token(monkeypatch):
     from django.contrib import messages
 
     from interpretation.susi import SusiError
@@ -164,43 +136,13 @@ def test_failed_connect_does_not_enable_interpretation(monkeypatch):
             SETTING_BASE_URL: PUBLIC_URL,
             "susi_connect_email": "bot@example.com",
             "susi_connect_password": "wrong",
-            SETTING_IS_ENABLED: True,
             CONNECT_POST_KEY: "1",
         }
     )
     assert form.is_valid(), form.errors
     form.save_pending_connect()
     form.run_connect_action(request=type("R", (), {})())
-    enabled = form.obj.settings.get(SETTING_IS_ENABLED, default=False, as_type=bool)
-    assert enabled is False
     assert not form.obj.settings.get(SETTING_AUTH_TOKEN)
-
-
-def test_successful_connect_with_enable_sets_enabled_flag(monkeypatch):
-    from django.contrib import messages
-
-    from interpretation.susi import SusiLoginResult
-
-    monkeypatch.setattr(messages, "success", lambda *a, **k: None)
-    monkeypatch.setattr(messages, "error", lambda *a, **k: None)
-
-    def fake_login(self, email, password):
-        return SusiLoginResult(token="jwt", email=email, name="Bot")
-
-    monkeypatch.setattr("interpretation.forms.SusiClient.login", fake_login)
-    form = _form(
-        {
-            SETTING_BASE_URL: PUBLIC_URL,
-            "susi_connect_email": "bot@example.com",
-            "susi_connect_password": "secret",
-            SETTING_IS_ENABLED: True,
-            CONNECT_POST_KEY: "1",
-        }
-    )
-    assert form.is_valid(), form.errors
-    form.save_pending_connect()
-    form.run_connect_action(request=type("R", (), {})())
-    assert form.obj.settings.get(SETTING_IS_ENABLED, as_type=bool) is True
 
 
 def test_save_does_not_persist_connect_credentials():
@@ -209,7 +151,6 @@ def test_save_does_not_persist_connect_credentials():
             SETTING_BASE_URL: PUBLIC_URL,
             "susi_connect_email": "bot@example.com",
             "susi_connect_password": "secret",
-            SETTING_IS_ENABLED: False,
         },
     )
     assert form.is_valid(), form.errors
@@ -223,6 +164,8 @@ def test_save_does_not_persist_connect_credentials():
 def test_room_form_parses_comma_separated_languages():
     form = RoomInterpretationForm(
         data={
+            "interpreter": RoomInterpretation.INTERPRETER_NONE,
+            "room_enabled": False,
             "stream_url": "https://stream.example.com/r.m3u8",
             "target_languages": "de, fr ,es",
             "transcription_provider": "",
@@ -236,6 +179,8 @@ def test_room_form_parses_comma_separated_languages():
 def test_room_form_deduplicates_languages():
     form = RoomInterpretationForm(
         data={
+            "interpreter": RoomInterpretation.INTERPRETER_NONE,
+            "room_enabled": False,
             "stream_url": "",
             "target_languages": "de, de, fr",
             "transcription_provider": "",
@@ -249,6 +194,8 @@ def test_room_form_deduplicates_languages():
 def test_room_form_empty_languages_is_empty_list():
     form = RoomInterpretationForm(
         data={
+            "interpreter": RoomInterpretation.INTERPRETER_NONE,
+            "room_enabled": False,
             "stream_url": "",
             "target_languages": "",
             "transcription_provider": "",

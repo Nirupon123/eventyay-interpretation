@@ -79,7 +79,7 @@ def test_is_susi_connected_requires_url_and_token():
     )
 
 
-def test_is_susi_configured_requires_enabled_and_connected():
+def test_is_susi_configured_matches_connected_credentials():
     assert is_susi_configured(_FakeEvent()) is False
     assert (
         is_susi_configured(
@@ -87,19 +87,6 @@ def test_is_susi_configured_requires_enabled_and_connected():
                 {
                     SETTING_BASE_URL: "https://example.com",
                     SETTING_AUTH_TOKEN: "tok",
-                    SETTING_IS_ENABLED: False,
-                }
-            )
-        )
-        is False
-    )
-    assert (
-        is_susi_configured(
-            _FakeEvent(
-                {
-                    SETTING_BASE_URL: "https://example.com",
-                    SETTING_AUTH_TOKEN: "tok",
-                    SETTING_IS_ENABLED: True,
                 }
             )
         )

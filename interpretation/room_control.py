@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 from django.utils.translation import gettext_lazy as _
 
+from .backends import get_backend, list_available_interpreters
 from .models import RoomInterpretation
-from .services import start_stream_session
-from .settings import get_susi_client, is_susi_configured, is_susi_connected, is_interpretation_enabled
+from .settings import is_susi_connected
 from .susi import SusiError
 from .utils import get_room_stream_url, normalize_target_languages, interpretation_dashboard_url
 
@@ -30,14 +30,38 @@ def normalize_session_status(status: str) -> str:
     return RoomInterpretation.STATUS_IDLE
 
 
+def is_room_interpretation_ready(
+    room, event, interpretation: RoomInterpretation | None = None
+) -> bool:
+    if interpretation is None:
+        interpretation = get_interpretation(room)
+    if interpretation is None or not interpretation.room_enabled:
+        return False
+    if interpretation.interpreter == RoomInterpretation.INTERPRETER_NONE:
+        return False
+    return get_backend(interpretation.interpreter).is_configured(event)
+
+
 def serialize_room_interpretation(room, event, interpretation=None) -> dict:
     if interpretation is None:
         interpretation = get_interpretation(room)
     detected_stream_url = get_room_stream_url(room)
     stream_url = ""
-    if interpretation and interpretation.stream_url:
-        stream_url = interpretation.stream_url
+    interpreter = RoomInterpretation.INTERPRETER_NONE
+    room_enabled = False
+    if interpretation:
+        stream_url = interpretation.stream_url or ""
+        interpreter = interpretation.interpreter
+        room_enabled = interpretation.room_enabled
+    backend = get_backend(interpreter)
     return {
+        "interpreter": interpreter,
+        "interpreter_label": str(backend.label),
+        "room_enabled": room_enabled,
+        "interpreter_ready": is_room_interpretation_ready(
+            room, event, interpretation
+        ),
+        "available_interpreters": list_available_interpreters(event),
         "target_languages": list(interpretation.target_languages or [])
         if interpretation
         else [],
@@ -47,31 +71,26 @@ def serialize_room_interpretation(room, event, interpretation=None) -> dict:
         "translation_provider": interpretation.translation_provider
         if interpretation
         else "",
+        "backend_config": dict(interpretation.backend_config or {})
+        if interpretation
+        else {},
         "status": normalize_session_status(
             interpretation.status if interpretation else RoomInterpretation.STATUS_IDLE
         ),
-        "session_id": interpretation.susi_session_id if interpretation else "",
+        "session_id": interpretation.backend_session_id if interpretation else "",
         "stream_url": stream_url or detected_stream_url,
         "detected_stream_url": detected_stream_url,
         "plugin_enabled": plugin_enabled(event),
         "susi_connected": is_susi_connected(event),
-        "interpretation_enabled": is_interpretation_enabled(event),
-        "interpretation_ready": is_susi_configured(event),
         "dashboard_url": interpretation_dashboard_url(
             event.organizer.slug, event.slug
         ),
     }
 
 
-def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
-    if not is_susi_connected(event):
-        raise ValueError(_("Connect to SUSI on the interpretation dashboard first."))
-
-    interpretation, _created = RoomInterpretation.objects.get_or_create(room=room)
-    if "target_languages" in data:
-        interpretation.target_languages = normalize_target_languages(
-            data.get("target_languages")
-        )
+def _apply_backend_config(interpretation: RoomInterpretation, data: dict) -> None:
+    if "backend_config" in data and isinstance(data.get("backend_config"), dict):
+        interpretation.backend_config = dict(data["backend_config"])
     if "transcription_provider" in data:
         interpretation.transcription_provider = (
             data.get("transcription_provider") or ""
@@ -80,7 +99,51 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
         interpretation.translation_provider = (
             data.get("translation_provider") or ""
         ).strip()
+
+
+def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
+    interpretation, _created = RoomInterpretation.objects.get_or_create(room=room)
+    was_running = bool(interpretation.backend_session_id)
+    old_interpreter = interpretation.interpreter
+
+    if "interpreter" in data:
+        interpreter = (data.get("interpreter") or RoomInterpretation.INTERPRETER_NONE).strip()
+        if interpreter not in {
+            RoomInterpretation.INTERPRETER_NONE,
+            RoomInterpretation.INTERPRETER_SUSI,
+        }:
+            raise ValueError(_("Unknown interpreter."))
+        if interpreter != RoomInterpretation.INTERPRETER_NONE:
+            backend = get_backend(interpreter)
+            if not backend.is_configured(event):
+                raise ValueError(
+                    _(
+                        "Connect %(name)s on the interpretation dashboard before "
+                        "selecting it for this room."
+                    )
+                    % {"name": backend.label}
+                )
+        interpretation.interpreter = interpreter
+
+    if "room_enabled" in data:
+        interpretation.room_enabled = bool(data.get("room_enabled"))
+
+    if "target_languages" in data:
+        interpretation.target_languages = normalize_target_languages(
+            data.get("target_languages")
+        )
+
+    _apply_backend_config(interpretation, data)
     interpretation.save()
+
+    if was_running and (
+        not interpretation.room_enabled
+        or interpretation.interpreter == RoomInterpretation.INTERPRETER_NONE
+        or interpretation.interpreter != old_interpreter
+    ):
+        stop_room_session(room, event)
+        interpretation.refresh_from_db()
+
     return interpretation
 
 
@@ -94,17 +157,36 @@ class SessionResult:
 def start_room_session(
     room, event, *, stream_url_override: str = ""
 ) -> SessionResult:
-    if not is_susi_configured(event):
+    interpretation, _created = RoomInterpretation.objects.get_or_create(room=room)
+
+    if not interpretation.room_enabled:
+        return SessionResult(
+            ok=False,
+            error=str(_("Interpretation is disabled for this room.")),
+            interpretation=interpretation,
+        )
+
+    if interpretation.interpreter == RoomInterpretation.INTERPRETER_NONE:
+        return SessionResult(
+            ok=False,
+            error=str(_("Select an interpreter for this room before starting.")),
+            interpretation=interpretation,
+        )
+
+    backend = get_backend(interpretation.interpreter)
+    if not backend.is_configured(event):
         return SessionResult(
             ok=False,
             error=str(
                 _(
-                    "Connect and enable SUSI on the interpretation dashboard before starting a room."
+                    "Connect %(name)s on the interpretation dashboard before "
+                    "starting this room."
                 )
+                % {"name": backend.label}
             ),
+            interpretation=interpretation,
         )
 
-    interpretation, _created = RoomInterpretation.objects.get_or_create(room=room)
     override = (stream_url_override or "").strip()
     stream_url = override or interpretation.stream_url or get_room_stream_url(room)
     if not stream_url:
@@ -114,52 +196,54 @@ def start_room_session(
             interpretation=interpretation,
         )
 
-    client = get_susi_client(event)
     try:
-        tenant_id = start_stream_session(
-            client,
-            stream_url,
-            transcription_provider=interpretation.transcription_provider,
-            translation_provider=interpretation.translation_provider,
-        )
-    except SusiError as exc:
+        session_id = backend.start(event, interpretation, stream_url=stream_url)
+    except (SusiError, ValueError) as exc:
         interpretation.status = RoomInterpretation.STATUS_IDLE
         interpretation.stream_url = stream_url
         interpretation.save()
         return SessionResult(ok=False, error=str(exc), interpretation=interpretation)
 
-    interpretation.susi_session_id = tenant_id
+    interpretation.backend_session_id = session_id
     interpretation.stream_url = stream_url
     interpretation.status = RoomInterpretation.STATUS_RUNNING
     interpretation.save()
     if hasattr(interpretation, "log_action"):
         interpretation.log_action(
             "interpretation.room.started",
-            data={"tenant_id": tenant_id, "stream_url": stream_url},
+            data={
+                "interpreter": interpretation.interpreter,
+                "session_id": session_id,
+                "stream_url": stream_url,
+            },
         )
     return SessionResult(ok=True, interpretation=interpretation)
 
 
 def stop_room_session(room, event) -> SessionResult:
     interpretation = get_interpretation(room)
-    if interpretation is None or not interpretation.susi_session_id:
+    if interpretation is None or not interpretation.backend_session_id:
         return SessionResult(
             ok=False,
             error=str(_("No running interpretation session for this room.")),
         )
 
-    client = get_susi_client(event)
+    backend = get_backend(interpretation.interpreter)
+    session_id = interpretation.backend_session_id
     try:
-        client.stop_session(interpretation.susi_session_id)
+        backend.stop(event, interpretation)
     except SusiError as exc:
         return SessionResult(ok=False, error=str(exc), interpretation=interpretation)
 
     if hasattr(interpretation, "log_action"):
         interpretation.log_action(
             "interpretation.room.stopped",
-            data={"tenant_id": interpretation.susi_session_id},
+            data={
+                "interpreter": interpretation.interpreter,
+                "session_id": session_id,
+            },
         )
     interpretation.status = RoomInterpretation.STATUS_IDLE
-    interpretation.susi_session_id = ""
+    interpretation.backend_session_id = ""
     interpretation.save()
     return SessionResult(ok=True, interpretation=interpretation)

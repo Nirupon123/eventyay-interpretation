@@ -94,5 +94,4 @@ def connected_event(event):
 def connection_payload():
     return {
         "interpretation-interpretation_base_url": "https://susi.example.com",
-        "interpretation-interpretation_is_enabled": "on",
     }

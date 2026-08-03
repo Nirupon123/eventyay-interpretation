@@ -8,7 +8,6 @@ from interpretation.forms import TEST_POST_KEY
 from interpretation.settings import (
     get_auth_token,
     get_base_url,
-    is_interpretation_enabled,
 )
 from interpretation.susi import SusiResult
 
@@ -26,7 +25,6 @@ def test_save_persists_connection(
     connected_event.settings.flush()
     assert get_base_url(connected_event) == "https://susi.example.com"
     assert get_auth_token(connected_event) == "jwt-test-token"
-    assert is_interpretation_enabled(connected_event) is True
 
     messages = [str(message) for message in get_messages(response.wsgi_request)]
     assert any("saved" in message.lower() for message in messages)

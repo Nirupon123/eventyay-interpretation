@@ -12,9 +12,6 @@ SETTING_SUSI_EMAIL = "interpretation_susi_email"
 SETTING_SUSI_NAME = "interpretation_susi_name"
 SETTING_IS_ENABLED = "interpretation_is_enabled"
 
-INTERPRETER_NONE = "none"
-INTERPRETER_SUSI = "susi"
-
 
 def get_base_url(event: Event) -> str:
     return event.settings.get(SETTING_BASE_URL, default="", as_type=str)
@@ -41,7 +38,8 @@ def is_susi_connected(event: Event) -> bool:
 
 
 def is_susi_configured(event: Event) -> bool:
-    return bool(is_interpretation_enabled(event) and is_susi_connected(event))
+    """Whether SUSI credentials are available for rooms that select SUSI."""
+    return is_susi_connected(event)
 
 
 def save_susi_connection(

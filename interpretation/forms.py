@@ -6,7 +6,6 @@ from eventyay.base.forms import SettingsForm
 from .models import RoomInterpretation
 from .settings import (
     SETTING_BASE_URL,
-    SETTING_IS_ENABLED,
     disconnect_susi,
     get_auth_token,
     get_base_url,
@@ -35,11 +34,6 @@ class InterpretationSettingsForm(SettingsForm):
         ),
         required=False,
         widget=forms.URLInput(attrs={"placeholder": "https://susi.example.com"}),
-    )
-    interpretation_is_enabled = forms.BooleanField(
-        label=_("Enable interpretation"),
-        help_text=_("Master switch for SUSI interpretation on this event."),
-        required=False,
     )
     susi_connect_email = forms.EmailField(
         label=_("SUSI account email"),
@@ -106,17 +100,6 @@ class InterpretationSettingsForm(SettingsForm):
                     _("Password is required to connect."),
                 )
 
-        if cleaned.get(SETTING_IS_ENABLED):
-            if not base_url:
-                self.add_error(
-                    SETTING_BASE_URL,
-                    _("A SUSI server URL is required to enable interpretation."),
-                )
-            if not get_auth_token(self.obj) and not self._connecting():
-                self.add_error(
-                    SETTING_IS_ENABLED,
-                    _("Connect to SUSI before enabling interpretation."),
-                )
         return cleaned
 
     _TRANSIENT_FIELDS = frozenset({"susi_connect_password", "susi_connect_email"})
@@ -135,9 +118,8 @@ class InterpretationSettingsForm(SettingsForm):
         return self._save_excluding_fields(self._TRANSIENT_FIELDS)
 
     def save_pending_connect(self):
-        """Persist URL before login; defer is_enabled until connect succeeds."""
-        excluded = self._TRANSIENT_FIELDS | {SETTING_IS_ENABLED}
-        return self._save_excluding_fields(excluded)
+        """Persist URL before login; credentials stay transient."""
+        return self._save_excluding_fields(self._TRANSIENT_FIELDS)
 
     def run_connect_action(self, request):
         base_url = self.cleaned_data.get(SETTING_BASE_URL) or get_base_url(self.obj)
@@ -157,9 +139,6 @@ class InterpretationSettingsForm(SettingsForm):
             token=result.token,
             email=result.email,
             name=result.name,
-        )
-        self.obj.settings.set(
-            SETTING_IS_ENABLED, bool(self.cleaned_data.get(SETTING_IS_ENABLED))
         )
         label = result.name or result.email
         if result.name and result.email:
@@ -227,6 +206,8 @@ class RoomInterpretationForm(forms.ModelForm):
     class Meta:
         model = RoomInterpretation
         fields = [
+            "interpreter",
+            "room_enabled",
             "stream_url",
             "target_languages",
             "transcription_provider",
