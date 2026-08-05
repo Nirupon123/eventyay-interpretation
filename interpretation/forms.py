@@ -136,7 +136,15 @@ class InterpretationSettingsForm(SettingsForm):
         # ponytail: login fields are POST-only; never write them to event.settings.
         was_enabled = is_interpretation_enabled(self.obj) if self.obj else True
         result = self._save_excluding_fields(self._TRANSIENT_FIELDS)
-        if self.obj and was_enabled and not is_interpretation_enabled(self.obj):
+        enable_key = (
+            f"{self.prefix}-{SETTING_IS_ENABLED}" if self.prefix else SETTING_IS_ENABLED
+        )
+        if (
+            self.obj
+            and was_enabled
+            and not is_interpretation_enabled(self.obj)
+            and enable_key in self.data
+        ):
             from .room_control import stop_all_event_sessions
 
             stop_all_event_sessions(self.obj)

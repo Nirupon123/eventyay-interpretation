@@ -66,6 +66,9 @@ class _FakeInterpretation:
     def save(self, update_fields=None):
         self.saved += 1
 
+    def refresh_from_db(self, using=None, fields=None):
+        return None
+
 
 def test_get_backend_defaults_to_none():
     backend = get_backend("unknown")
