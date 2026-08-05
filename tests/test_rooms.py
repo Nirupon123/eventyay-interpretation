@@ -202,5 +202,22 @@ def test_start_stream_session_requires_stream_url():
         start_stream_session(RecordingClient(), "")
 
 
+def test_start_stream_session_rolls_back_on_configure_failure():
+    from interpretation.susi import SusiError
+
+    class FailingClient(RecordingClient):
+        def configure(self, tenant_id, **kwargs):
+            raise SusiError("configure failed")
+
+        def stop_session(self, tenant_id):
+            self.calls.append(("stop_session", tenant_id))
+
+    client = FailingClient()
+    with pytest.raises(SusiError):
+        start_stream_session(client, "https://www.youtube.com/watch?v=abc")
+    assert client.calls[0] == ("create_session", SUSI_STREAM_TYPE)
+    assert ("stop_session", "tenant-1") in client.calls
+
+
 def test_room_settings_resume_path():
     assert room_settings_resume_path(42) == "video/admin/rooms/42"

@@ -51,6 +51,9 @@ def save_susi_connection(
 
 
 def disconnect_susi(event: Event) -> None:
+    from .room_control import stop_all_event_sessions
+
+    stop_all_event_sessions(event)
     event.settings.set(SETTING_AUTH_TOKEN, "")
     event.settings.set(SETTING_SUSI_EMAIL, "")
     event.settings.set(SETTING_SUSI_NAME, "")

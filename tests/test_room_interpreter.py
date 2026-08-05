@@ -91,6 +91,21 @@ def test_is_room_interpretation_ready_requires_enabled_interpreter_and_credentia
     assert is_room_interpretation_ready(_FakeRoom(), no_creds, ready) is False
 
 
+def test_start_room_session_rejects_disabled_event(monkeypatch):
+    event = _FakeEvent({"interpretation_is_enabled": False})
+    interpretation = _FakeInterpretation(
+        room_enabled=True, interpreter=INTERPRETER_SUSI
+    )
+
+    monkeypatch.setattr(
+        "interpretation.room_control.RoomInterpretation.objects.get_or_create",
+        lambda room: (interpretation, False),
+    )
+    result = start_room_session(_FakeRoom(), event)
+    assert not result.ok
+    assert "turned off" in result.error.lower()
+
+
 def test_start_room_session_rejects_disabled_room(monkeypatch):
     interpretation = _FakeInterpretation(
         room_enabled=False, interpreter=INTERPRETER_SUSI

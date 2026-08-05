@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .susi import SusiError
 from .utils import SUSI_STREAM_TYPE
 
 
@@ -50,15 +51,22 @@ def start_stream_session(
         raise ValueError("stream_url is required to start a session")
 
     tenant_id = client.create_session(source=SUSI_STREAM_TYPE)
-    client.configure(
-        tenant_id,
-        stream_url=stream_url,
-        stream_type=SUSI_STREAM_TYPE,
-        transcription=_provider_config(transcription_provider),
-        translation=_translation_config(
-            translation_provider,
-            source_language=source_language,
-            target_languages=target_languages,
-        ),
-    )
+    try:
+        client.configure(
+            tenant_id,
+            stream_url=stream_url,
+            stream_type=SUSI_STREAM_TYPE,
+            transcription=_provider_config(transcription_provider),
+            translation=_translation_config(
+                translation_provider,
+                source_language=source_language,
+                target_languages=target_languages,
+            ),
+        )
+    except Exception:
+        try:
+            client.stop_session(tenant_id)
+        except SusiError:
+            pass
+        raise
     return tenant_id

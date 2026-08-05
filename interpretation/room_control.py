@@ -8,9 +8,15 @@ from django.utils.translation import gettext_lazy as _
 
 from .backends import get_backend, list_available_interpreters
 from .models import RoomInterpretation
-from .settings import is_susi_connected
+from .settings import is_interpretation_enabled, is_susi_connected
 from .susi import SusiError
-from .utils import get_room_stream_url, normalize_target_languages, interpretation_dashboard_url
+from .utils import (
+    get_room_stream_url,
+    interpretation_dashboard_url,
+    normalize_target_languages,
+    validate_backend_config,
+    validate_target_language_codes,
+)
 
 PLUGIN_MODULE = "interpretation"
 
@@ -89,8 +95,8 @@ def serialize_room_interpretation(room, event, interpretation=None) -> dict:
 
 
 def _apply_backend_config(interpretation: RoomInterpretation, data: dict) -> None:
-    if "backend_config" in data and isinstance(data.get("backend_config"), dict):
-        interpretation.backend_config = dict(data["backend_config"])
+    if "backend_config" in data:
+        interpretation.backend_config = validate_backend_config(data["backend_config"])
     if "transcription_provider" in data:
         interpretation.transcription_provider = (
             data.get("transcription_provider") or ""
@@ -129,8 +135,8 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
         interpretation.room_enabled = bool(data.get("room_enabled"))
 
     if "target_languages" in data:
-        interpretation.target_languages = normalize_target_languages(
-            data.get("target_languages")
+        interpretation.target_languages = validate_target_language_codes(
+            normalize_target_languages(data.get("target_languages"))
         )
 
     _apply_backend_config(interpretation, data)
@@ -158,6 +164,13 @@ def start_room_session(
     room, event, *, stream_url_override: str = ""
 ) -> SessionResult:
     interpretation, _created = RoomInterpretation.objects.get_or_create(room=room)
+
+    if not is_interpretation_enabled(event):
+        return SessionResult(
+            ok=False,
+            error=str(_("Live interpretation is turned off for this event.")),
+            interpretation=interpretation,
+        )
 
     if not interpretation.room_enabled:
         return SessionResult(
@@ -226,7 +239,21 @@ def start_room_session(
     return SessionResult(ok=True, interpretation=interpretation)
 
 
-def stop_room_session(room, event) -> SessionResult:
+def _clear_local_session(interpretation: RoomInterpretation, *, session_id: str = "") -> None:
+    if hasattr(interpretation, "log_action") and session_id:
+        interpretation.log_action(
+            "interpretation.room.stopped",
+            data={
+                "interpreter": interpretation.interpreter,
+                "session_id": session_id,
+            },
+        )
+    interpretation.status = RoomInterpretation.STATUS_IDLE
+    interpretation.backend_session_id = ""
+    interpretation.save()
+
+
+def stop_room_session(room, event, *, force_clear: bool = False) -> SessionResult:
     interpretation = get_interpretation(room)
     if interpretation is None or not interpretation.backend_session_id:
         return SessionResult(
@@ -239,17 +266,19 @@ def stop_room_session(room, event) -> SessionResult:
     try:
         backend.stop(event, interpretation)
     except SusiError as exc:
-        return SessionResult(ok=False, error=str(exc), interpretation=interpretation)
+        if not force_clear:
+            return SessionResult(ok=False, error=str(exc), interpretation=interpretation)
 
-    if hasattr(interpretation, "log_action"):
-        interpretation.log_action(
-            "interpretation.room.stopped",
-            data={
-                "interpreter": interpretation.interpreter,
-                "session_id": session_id,
-            },
-        )
-    interpretation.status = RoomInterpretation.STATUS_IDLE
-    interpretation.backend_session_id = ""
-    interpretation.save()
+    _clear_local_session(interpretation, session_id=session_id)
     return SessionResult(ok=True, interpretation=interpretation)
+
+
+def stop_all_event_sessions(event) -> None:
+    """Stop every room session for an event (e.g. before SUSI disconnect)."""
+    interpretations = (
+        RoomInterpretation.objects.filter(room__event=event)
+        .exclude(backend_session_id="")
+        .select_related("room")
+    )
+    for interpretation in interpretations:
+        stop_room_session(interpretation.room, event, force_clear=True)
