@@ -211,21 +211,26 @@ def start_room_session(
 
     if (
         interpretation.backend_session_id
-        and interpretation.status == RoomInterpretation.STATUS_RUNNING
+        and normalize_session_status(interpretation.status)
+        == RoomInterpretation.STATUS_RUNNING
     ):
         return SessionResult(ok=True, interpretation=interpretation)
 
     try:
         session_id = backend.start(event, interpretation, stream_url=stream_url)
     except (SusiError, ValueError) as exc:
-        interpretation.status = RoomInterpretation.STATUS_IDLE
+        interpretation.status = normalize_session_status(
+            RoomInterpretation.STATUS_IDLE
+        )
         interpretation.stream_url = stream_url
         interpretation.save()
         return SessionResult(ok=False, error=str(exc), interpretation=interpretation)
 
     interpretation.backend_session_id = session_id
     interpretation.stream_url = stream_url
-    interpretation.status = RoomInterpretation.STATUS_RUNNING
+    interpretation.status = normalize_session_status(
+        RoomInterpretation.STATUS_RUNNING
+    )
     interpretation.save()
     if hasattr(interpretation, "log_action"):
         interpretation.log_action(
@@ -248,12 +253,12 @@ def _clear_local_session(interpretation: RoomInterpretation, *, session_id: str 
                 "session_id": session_id,
             },
         )
-    interpretation.status = RoomInterpretation.STATUS_IDLE
+    interpretation.status = normalize_session_status(RoomInterpretation.STATUS_IDLE)
     interpretation.backend_session_id = ""
     interpretation.save()
 
 
-def stop_room_session(room, event, *, force_clear: bool = False) -> SessionResult:
+def stop_room_session(room, event) -> SessionResult:
     interpretation = get_interpretation(room)
     if interpretation is None or not interpretation.backend_session_id:
         return SessionResult(
@@ -263,13 +268,19 @@ def stop_room_session(room, event, *, force_clear: bool = False) -> SessionResul
 
     backend = get_backend(interpretation.interpreter)
     session_id = interpretation.backend_session_id
+    remote_error = ""
     try:
         backend.stop(event, interpretation)
     except SusiError as exc:
-        if not force_clear:
-            return SessionResult(ok=False, error=str(exc), interpretation=interpretation)
+        remote_error = str(exc)
 
     _clear_local_session(interpretation, session_id=session_id)
+    if remote_error:
+        return SessionResult(
+            ok=False,
+            error=remote_error,
+            interpretation=interpretation,
+        )
     return SessionResult(ok=True, interpretation=interpretation)
 
 
@@ -281,4 +292,4 @@ def stop_all_event_sessions(event) -> None:
         .select_related("room")
     )
     for interpretation in interpretations:
-        stop_room_session(interpretation.room, event, force_clear=True)
+        stop_room_session(interpretation.room, event)

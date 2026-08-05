@@ -32,6 +32,8 @@ class SusiBackend:
             return
         client = get_susi_client(event)
         try:
-            client.stop_session(session_id)
+            result = client.stop_session(session_id)
         except SusiError:
             raise
+        if not result.ok:
+            raise SusiError(f"Failed to stop SUSI session: {result.data}")

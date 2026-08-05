@@ -6,7 +6,9 @@ from interpretation.backends import INTERPRETER_NONE, INTERPRETER_SUSI, get_back
 from interpretation.models import RoomInterpretation
 from interpretation.room_control import (
     is_room_interpretation_ready,
+    normalize_session_status,
     start_room_session,
+    stop_room_session,
     update_room_interpretation,
 )
 
@@ -69,6 +71,13 @@ class _FakeInterpretation:
 def test_get_backend_defaults_to_none():
     backend = get_backend("unknown")
     assert backend.id == INTERPRETER_NONE
+
+
+def test_normalize_session_status_maps_legacy_values():
+    assert normalize_session_status(RoomInterpretation.STATUS_RUNNING) == "running"
+    assert normalize_session_status(RoomInterpretation.STATUS_IDLE) == "idle"
+    assert normalize_session_status(RoomInterpretation.STATUS_STOPPED) == "idle"
+    assert normalize_session_status(RoomInterpretation.STATUS_ERROR) == "idle"
 
 
 def test_is_room_interpretation_ready_requires_enabled_interpreter_and_credentials():
@@ -214,6 +223,41 @@ def test_start_room_session_is_idempotent_when_already_running(monkeypatch):
     assert result.ok
     assert calls == []
     assert interpretation.backend_session_id == "tenant-1"
+
+
+def test_stop_room_session_clears_local_state_when_remote_stop_fails(monkeypatch):
+    event = _FakeEvent(
+        {
+            "interpretation_base_url": "https://susi.example.com",
+            "interpretation_auth_token": "tok",
+        }
+    )
+    interpretation = _FakeInterpretation(
+        room_enabled=True,
+        interpreter=INTERPRETER_SUSI,
+        backend_session_id="tenant-1",
+        status=RoomInterpretation.STATUS_RUNNING,
+    )
+
+    class FakeBackend:
+        def stop(self, event, interpretation):
+            from interpretation.susi import SusiError
+
+            raise SusiError("SUSI unreachable")
+
+    monkeypatch.setattr(
+        "interpretation.room_control.get_interpretation",
+        lambda room: interpretation,
+    )
+    monkeypatch.setattr(
+        "interpretation.room_control.get_backend",
+        lambda interpreter_id: FakeBackend(),
+    )
+
+    result = stop_room_session(_FakeRoom(), event)
+    assert not result.ok
+    assert interpretation.status == RoomInterpretation.STATUS_IDLE
+    assert interpretation.backend_session_id == ""
 
 
 def test_update_room_interpretation_rejects_unconfigured_interpreter(monkeypatch):
