@@ -62,10 +62,7 @@ def test_module_youtube_id_normalized():
             {"type": "livestream.youtube", "config": {"ytid": "dQw4w9WgXcQ"}},
         ]
     )
-    assert (
-        get_module_stream_url(room)
-        == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    )
+    assert get_module_stream_url(room) == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
 def test_module_youtube_url_passthrough():
@@ -121,9 +118,7 @@ def test_schedule_includes_youtube():
 
 
 def test_schedule_skips_iframe():
-    room = FakeRoom(
-        schedules=[FakeSchedule("https://embed/x", stream_type="iframe")]
-    )
+    room = FakeRoom(schedules=[FakeSchedule("https://embed/x", stream_type="iframe")])
     assert get_schedule_stream_url(room) == ""
 
 

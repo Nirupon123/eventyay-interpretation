@@ -60,9 +60,7 @@ class _FakeInterpretation:
         self.translation_provider = ""
         self.backend_config = {}
         self.backend_session_id = kwargs.get("backend_session_id", "")
-        self.status = kwargs.get(
-            "status", RoomInterpretation.STATUS_IDLE
-        )
+        self.status = kwargs.get("status", RoomInterpretation.STATUS_IDLE)
         self.saved = 0
 
     def save(self, update_fields=None):

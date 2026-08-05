@@ -73,9 +73,7 @@ def serialize_room_interpretation(room, event, interpretation=None) -> dict:
         "interpreter": interpreter,
         "interpreter_label": str(backend.label),
         "room_enabled": room_enabled,
-        "interpreter_ready": is_room_interpretation_ready(
-            room, event, interpretation
-        ),
+        "interpreter_ready": is_room_interpretation_ready(room, event, interpretation),
         "available_interpreters": list_available_interpreters(event),
         "target_languages": list(interpretation.target_languages or [])
         if interpretation
@@ -97,9 +95,7 @@ def serialize_room_interpretation(room, event, interpretation=None) -> dict:
         "detected_stream_url": detected_stream_url,
         "plugin_enabled": plugin_enabled(event),
         "susi_connected": is_susi_connected(event),
-        "dashboard_url": interpretation_dashboard_url(
-            event.organizer.slug, event.slug
-        ),
+        "dashboard_url": interpretation_dashboard_url(event.organizer.slug, event.slug),
     }
 
 
@@ -173,9 +169,7 @@ class SessionResult:
     interpretation: RoomInterpretation | None = None
 
 
-def start_room_session(
-    room, event, *, stream_url_override: str = ""
-) -> SessionResult:
+def start_room_session(room, event, *, stream_url_override: str = "") -> SessionResult:
     interpretation, _created = RoomInterpretation.objects.get_or_create(room=room)
 
     if not is_interpretation_enabled(event):
@@ -232,9 +226,7 @@ def start_room_session(
     try:
         session_id = backend.start(event, interpretation, stream_url=stream_url)
     except (SusiError, ValueError) as exc:
-        interpretation.status = normalize_session_status(
-            RoomInterpretation.STATUS_IDLE
-        )
+        interpretation.status = normalize_session_status(RoomInterpretation.STATUS_IDLE)
         interpretation.backend_session_id = ""
         interpretation.stream_url = stream_url
         interpretation.save()
@@ -242,9 +234,7 @@ def start_room_session(
 
     interpretation.backend_session_id = session_id
     interpretation.stream_url = stream_url
-    interpretation.status = normalize_session_status(
-        RoomInterpretation.STATUS_RUNNING
-    )
+    interpretation.status = normalize_session_status(RoomInterpretation.STATUS_RUNNING)
     interpretation.save()
     if hasattr(interpretation, "log_action"):
         interpretation.log_action(
