@@ -158,7 +158,9 @@ def test_start_room_session_rejects_disabled_room(monkeypatch):
 
 
 def test_start_room_session_rejects_missing_interpreter(monkeypatch):
-    interpretation = _FakeInterpretation(room_enabled=True, interpreter=INTERPRETER_NONE)
+    interpretation = _FakeInterpretation(
+        room_enabled=True, interpreter=INTERPRETER_NONE
+    )
 
     monkeypatch.setattr(
         "interpretation.room_control.RoomInterpretation.objects.get_or_create",
@@ -346,7 +348,11 @@ def test_update_room_interpretation_raises_when_auto_stop_fails(monkeypatch):
         lambda room, event: type(
             "R",
             (),
-            {"ok": False, "error": "SUSI unreachable", "interpretation": interpretation},
+            {
+                "ok": False,
+                "error": "SUSI unreachable",
+                "interpretation": interpretation,
+            },
         )(),
     )
 

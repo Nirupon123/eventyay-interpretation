@@ -227,7 +227,8 @@ class RoomInterpretationForm(forms.ModelForm):
         required=False,
         label=_("Caption languages"),
         help_text=_(
-            "Comma-separated language codes attendees can read captions in, e.g. de, fr."
+            "Comma-separated language codes attendees can read captions in, "
+            "e.g. de, fr."
         ),
         widget=forms.TextInput(attrs={"placeholder": "de, fr, es"}),
     )

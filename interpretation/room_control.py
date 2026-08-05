@@ -122,7 +122,9 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
     old_interpreter = interpretation.interpreter
 
     if "interpreter" in data:
-        interpreter = (data.get("interpreter") or RoomInterpretation.INTERPRETER_NONE).strip()
+        interpreter = (
+            data.get("interpreter") or RoomInterpretation.INTERPRETER_NONE
+        ).strip()
         if interpreter not in {
             RoomInterpretation.INTERPRETER_NONE,
             RoomInterpretation.INTERPRETER_SUSI,
@@ -256,7 +258,9 @@ def start_room_session(
     return SessionResult(ok=True, interpretation=interpretation)
 
 
-def _clear_local_session(interpretation: RoomInterpretation, *, session_id: str = "") -> None:
+def _clear_local_session(
+    interpretation: RoomInterpretation, *, session_id: str = ""
+) -> None:
     if hasattr(interpretation, "log_action") and session_id:
         interpretation.log_action(
             "interpretation.room.stopped",
