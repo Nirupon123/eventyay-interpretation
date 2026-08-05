@@ -171,6 +171,8 @@ def test_start_stream_session_uses_susi_youtube_source():
         "https://vs-hls-push-ww-live.akamaized.net/x/master.m3u8",
         transcription_provider="whisper_local",
         translation_provider="nllb_local",
+        source_language="en",
+        target_languages=["de", "fr"],
     )
     assert tenant == "tenant-1"
     assert client.calls[0] == ("create_session", SUSI_STREAM_TYPE)
@@ -180,7 +182,11 @@ def test_start_stream_session_uses_susi_youtube_source():
     assert kwargs["stream_url"].endswith("master.m3u8")
     assert kwargs["stream_type"] == SUSI_STREAM_TYPE
     assert kwargs["transcription"] == {"provider_name": "whisper_local"}
-    assert kwargs["translation"] == {"provider_name": "nllb_local"}
+    assert kwargs["translation"] == {
+        "provider_name": "nllb_local",
+        "source_lang": "en",
+        "target_lang": "de",
+    }
 
 
 def test_start_stream_session_omits_empty_providers():

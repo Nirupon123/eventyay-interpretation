@@ -22,6 +22,8 @@ class SusiBackend:
             stream_url,
             transcription_provider=interpretation.transcription_provider,
             translation_provider=interpretation.translation_provider,
+            source_language=interpretation.source_language,
+            target_languages=list(interpretation.target_languages or []),
         )
 
     def stop(self, event, interpretation) -> None:

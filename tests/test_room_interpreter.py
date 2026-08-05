@@ -51,12 +51,15 @@ class _FakeInterpretation:
         self.interpreter = kwargs.get("interpreter", INTERPRETER_NONE)
         self.room_enabled = kwargs.get("room_enabled", False)
         self.stream_url = kwargs.get("stream_url", "")
+        self.source_language = kwargs.get("source_language", "")
         self.target_languages = kwargs.get("target_languages", [])
         self.transcription_provider = ""
         self.translation_provider = ""
         self.backend_config = {}
         self.backend_session_id = kwargs.get("backend_session_id", "")
-        self.status = RoomInterpretation.STATUS_IDLE
+        self.status = kwargs.get(
+            "status", RoomInterpretation.STATUS_IDLE
+        )
         self.saved = 0
 
     def save(self, update_fields=None):
@@ -155,6 +158,47 @@ def test_start_room_session_uses_selected_backend(monkeypatch):
     assert calls == ["https://x/r.m3u8"]
     assert interpretation.backend_session_id == "tenant-42"
     assert interpretation.status == RoomInterpretation.STATUS_RUNNING
+
+
+def test_start_room_session_is_idempotent_when_already_running(monkeypatch):
+    event = _FakeEvent(
+        {
+            "interpretation_base_url": "https://susi.example.com",
+            "interpretation_auth_token": "tok",
+        }
+    )
+    interpretation = _FakeInterpretation(
+        room_enabled=True,
+        interpreter=INTERPRETER_SUSI,
+        backend_session_id="tenant-1",
+        status=RoomInterpretation.STATUS_RUNNING,
+    )
+    calls = []
+
+    class FakeBackend:
+        id = INTERPRETER_SUSI
+        label = "SUSI"
+
+        def is_configured(self, event):
+            return True
+
+        def start(self, event, interpretation, *, stream_url):
+            calls.append(stream_url)
+            return "tenant-2"
+
+    monkeypatch.setattr(
+        "interpretation.room_control.RoomInterpretation.objects.get_or_create",
+        lambda room: (interpretation, False),
+    )
+    monkeypatch.setattr(
+        "interpretation.room_control.get_backend",
+        lambda interpreter_id: FakeBackend(),
+    )
+
+    result = start_room_session(_FakeRoom(), event)
+    assert result.ok
+    assert calls == []
+    assert interpretation.backend_session_id == "tenant-1"
 
 
 def test_update_room_interpretation_rejects_unconfigured_interpreter(monkeypatch):

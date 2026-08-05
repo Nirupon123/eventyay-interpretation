@@ -9,6 +9,7 @@ from interpretation.models import RoomInterpretation
 from interpretation.settings import (
     SETTING_AUTH_TOKEN,
     SETTING_BASE_URL,
+    SETTING_IS_ENABLED,
     SETTING_SUSI_EMAIL,
 )
 
@@ -18,6 +19,7 @@ PUBLIC_URL = "https://example.com"
 _SETTING_TYPES = {
     SETTING_BASE_URL: str,
     SETTING_AUTH_TOKEN: str,
+    SETTING_IS_ENABLED: bool,
 }
 
 
@@ -87,6 +89,17 @@ def test_connect_requires_email_and_password():
     assert not form.is_valid()
     assert "susi_connect_email" in form.errors
     assert "susi_connect_password" in form.errors
+
+
+def test_enable_without_susi_connection_is_rejected():
+    form = _form(
+        {
+            SETTING_BASE_URL: PUBLIC_URL,
+            SETTING_IS_ENABLED: True,
+        }
+    )
+    assert not form.is_valid()
+    assert SETTING_IS_ENABLED in form.errors
 
 
 def test_connect_with_credentials_is_valid(monkeypatch):

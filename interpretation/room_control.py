@@ -196,6 +196,12 @@ def start_room_session(
             interpretation=interpretation,
         )
 
+    if (
+        interpretation.backend_session_id
+        and interpretation.status == RoomInterpretation.STATUS_RUNNING
+    ):
+        return SessionResult(ok=True, interpretation=interpretation)
+
     try:
         session_id = backend.start(event, interpretation, stream_url=stream_url)
     except (SusiError, ValueError) as exc:
