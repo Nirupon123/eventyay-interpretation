@@ -12,6 +12,7 @@ from .settings import (
     get_base_url,
     get_susi_email,
     get_susi_name,
+    is_interpretation_enabled,
     save_susi_connection,
 )
 from .susi import SusiClient, SusiError
@@ -133,7 +134,13 @@ class InterpretationSettingsForm(SettingsForm):
 
     def save(self):
         # ponytail: login fields are POST-only; never write them to event.settings.
-        return self._save_excluding_fields(self._TRANSIENT_FIELDS)
+        was_enabled = is_interpretation_enabled(self.obj) if self.obj else True
+        result = self._save_excluding_fields(self._TRANSIENT_FIELDS)
+        if self.obj and was_enabled and not is_interpretation_enabled(self.obj):
+            from .room_control import stop_all_event_sessions
+
+            stop_all_event_sessions(self.obj)
+        return result
 
     def save_pending_connect(self):
         """Persist URL before login; defer is_enabled until connect succeeds."""

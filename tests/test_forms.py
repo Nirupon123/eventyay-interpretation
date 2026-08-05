@@ -174,6 +174,32 @@ def test_save_does_not_persist_connect_credentials():
     assert stored.get(SETTING_BASE_URL) == PUBLIC_URL
 
 
+def test_save_disabling_event_stops_sessions(monkeypatch):
+    stopped = []
+
+    def fake_stop_all(event):
+        stopped.append(event)
+
+    monkeypatch.setattr(
+        "interpretation.room_control.stop_all_event_sessions",
+        fake_stop_all,
+    )
+    form = _form(
+        {
+            SETTING_BASE_URL: PUBLIC_URL,
+            SETTING_IS_ENABLED: False,
+        },
+        settings={
+            SETTING_BASE_URL: PUBLIC_URL,
+            SETTING_AUTH_TOKEN: "tok",
+            SETTING_IS_ENABLED: True,
+        },
+    )
+    assert form.is_valid(), form.errors
+    form.save()
+    assert stopped == [form.obj]
+
+
 def test_room_form_parses_comma_separated_languages():
     form = RoomInterpretationForm(
         data={

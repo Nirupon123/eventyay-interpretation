@@ -36,6 +36,15 @@ def normalize_session_status(status: str) -> str:
     return RoomInterpretation.STATUS_IDLE
 
 
+def _public_session_id(interpretation: RoomInterpretation | None) -> str:
+    if interpretation is None:
+        return ""
+    status = normalize_session_status(interpretation.status)
+    if status != RoomInterpretation.STATUS_RUNNING:
+        return ""
+    return interpretation.backend_session_id or ""
+
+
 def is_room_interpretation_ready(
     room, event, interpretation: RoomInterpretation | None = None
 ) -> bool:
@@ -83,7 +92,7 @@ def serialize_room_interpretation(room, event, interpretation=None) -> dict:
         "status": normalize_session_status(
             interpretation.status if interpretation else RoomInterpretation.STATUS_IDLE
         ),
-        "session_id": interpretation.backend_session_id if interpretation else "",
+        "session_id": _public_session_id(interpretation),
         "stream_url": stream_url or detected_stream_url,
         "detected_stream_url": detected_stream_url,
         "plugin_enabled": plugin_enabled(event),
@@ -147,8 +156,10 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
         or interpretation.interpreter == RoomInterpretation.INTERPRETER_NONE
         or interpretation.interpreter != old_interpreter
     ):
-        stop_room_session(room, event)
+        result = stop_room_session(room, event)
         interpretation.refresh_from_db()
+        if not result.ok:
+            raise ValueError(result.error)
 
     return interpretation
 
@@ -222,6 +233,7 @@ def start_room_session(
         interpretation.status = normalize_session_status(
             RoomInterpretation.STATUS_IDLE
         )
+        interpretation.backend_session_id = ""
         interpretation.stream_url = stream_url
         interpretation.save()
         return SessionResult(ok=False, error=str(exc), interpretation=interpretation)

@@ -7,6 +7,7 @@ from interpretation.models import RoomInterpretation
 from interpretation.room_control import (
     is_room_interpretation_ready,
     normalize_session_status,
+    serialize_room_interpretation,
     start_room_session,
     stop_room_session,
     update_room_interpretation,
@@ -78,6 +79,30 @@ def test_normalize_session_status_maps_legacy_values():
     assert normalize_session_status(RoomInterpretation.STATUS_IDLE) == "idle"
     assert normalize_session_status(RoomInterpretation.STATUS_STOPPED) == "idle"
     assert normalize_session_status(RoomInterpretation.STATUS_ERROR) == "idle"
+
+
+def test_serialize_hides_session_id_when_not_running():
+    event = _FakeEvent()
+    interpretation = _FakeInterpretation(
+        interpreter=INTERPRETER_SUSI,
+        backend_session_id="tenant-stale",
+        status=RoomInterpretation.STATUS_IDLE,
+    )
+    data = serialize_room_interpretation(_FakeRoom(), event, interpretation)
+    assert data["status"] == "idle"
+    assert data["session_id"] == ""
+
+
+def test_serialize_includes_session_id_when_running():
+    event = _FakeEvent()
+    interpretation = _FakeInterpretation(
+        interpreter=INTERPRETER_SUSI,
+        backend_session_id="tenant-live",
+        status=RoomInterpretation.STATUS_RUNNING,
+    )
+    data = serialize_room_interpretation(_FakeRoom(), event, interpretation)
+    assert data["status"] == "running"
+    assert data["session_id"] == "tenant-live"
 
 
 def test_is_room_interpretation_ready_requires_enabled_interpreter_and_credentials():
@@ -225,6 +250,44 @@ def test_start_room_session_is_idempotent_when_already_running(monkeypatch):
     assert interpretation.backend_session_id == "tenant-1"
 
 
+def test_start_room_session_clears_stale_session_id_on_failure(monkeypatch):
+    event = _FakeEvent(
+        {
+            "interpretation_base_url": "https://susi.example.com",
+            "interpretation_auth_token": "tok",
+        }
+    )
+    interpretation = _FakeInterpretation(
+        room_enabled=True,
+        interpreter=INTERPRETER_SUSI,
+        backend_session_id="tenant-old",
+        status=RoomInterpretation.STATUS_IDLE,
+    )
+
+    class FakeBackend:
+        def is_configured(self, event):
+            return True
+
+        def start(self, event, interpretation, *, stream_url):
+            from interpretation.susi import SusiError
+
+            raise SusiError("configure failed")
+
+    monkeypatch.setattr(
+        "interpretation.room_control.RoomInterpretation.objects.get_or_create",
+        lambda room: (interpretation, False),
+    )
+    monkeypatch.setattr(
+        "interpretation.room_control.get_backend",
+        lambda interpreter_id: FakeBackend(),
+    )
+
+    result = start_room_session(_FakeRoom(), event)
+    assert not result.ok
+    assert interpretation.backend_session_id == ""
+    assert interpretation.status == RoomInterpretation.STATUS_IDLE
+
+
 def test_stop_room_session_clears_local_state_when_remote_stop_fails(monkeypatch):
     event = _FakeEvent(
         {
@@ -258,6 +321,41 @@ def test_stop_room_session_clears_local_state_when_remote_stop_fails(monkeypatch
     assert not result.ok
     assert interpretation.status == RoomInterpretation.STATUS_IDLE
     assert interpretation.backend_session_id == ""
+
+
+def test_update_room_interpretation_raises_when_auto_stop_fails(monkeypatch):
+    event = _FakeEvent(
+        {
+            "interpretation_base_url": "https://susi.example.com",
+            "interpretation_auth_token": "tok",
+        }
+    )
+    interpretation = _FakeInterpretation(
+        room_enabled=True,
+        interpreter=INTERPRETER_SUSI,
+        backend_session_id="tenant-1",
+        status=RoomInterpretation.STATUS_RUNNING,
+    )
+
+    monkeypatch.setattr(
+        "interpretation.room_control.RoomInterpretation.objects.get_or_create",
+        lambda room: (interpretation, False),
+    )
+    monkeypatch.setattr(
+        "interpretation.room_control.stop_room_session",
+        lambda room, event: type(
+            "R",
+            (),
+            {"ok": False, "error": "SUSI unreachable", "interpretation": interpretation},
+        )(),
+    )
+
+    with pytest.raises(ValueError, match="SUSI unreachable"):
+        update_room_interpretation(
+            _FakeRoom(),
+            event,
+            {"interpreter": INTERPRETER_NONE},
+        )
 
 
 def test_update_room_interpretation_rejects_unconfigured_interpreter(monkeypatch):
