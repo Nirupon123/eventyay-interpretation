@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.utils.translation import gettext_lazy as _
 from eventyay.base.forms import SettingsForm
 
+from .models import RoomInterpretation
 from .settings import (
     SETTING_BASE_URL,
     SETTING_IS_ENABLED,
@@ -11,6 +12,7 @@ from .settings import (
     get_base_url,
     get_susi_email,
     get_susi_name,
+    is_interpretation_enabled,
     save_susi_connection,
 )
 from .susi import SusiClient, SusiError
@@ -35,11 +37,6 @@ class InterpretationSettingsForm(SettingsForm):
         required=False,
         widget=forms.URLInput(attrs={"placeholder": "https://susi.example.com"}),
     )
-    interpretation_is_enabled = forms.BooleanField(
-        label=_("Enable interpretation"),
-        help_text=_("Master switch for SUSI interpretation on this event."),
-        required=False,
-    )
     susi_connect_email = forms.EmailField(
         label=_("SUSI account email"),
         required=False,
@@ -49,6 +46,10 @@ class InterpretationSettingsForm(SettingsForm):
         required=False,
         widget=forms.PasswordInput(render_value=False),
     )
+    interpretation_is_enabled = forms.BooleanField(
+        label=_("Enable live interpretation for this event"),
+        required=False,
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,6 +57,7 @@ class InterpretationSettingsForm(SettingsForm):
             "interpretation_base_url",
             "susi_connect_email",
             "susi_connect_password",
+            "interpretation_is_enabled",
         ):
             self.fields[name].widget.attrs.setdefault("class", "form-control")
         if self.obj and get_susi_email(self.obj):
@@ -116,6 +118,7 @@ class InterpretationSettingsForm(SettingsForm):
                     SETTING_IS_ENABLED,
                     _("Connect to SUSI before enabling interpretation."),
                 )
+
         return cleaned
 
     _TRANSIENT_FIELDS = frozenset({"susi_connect_password", "susi_connect_email"})
@@ -131,7 +134,21 @@ class InterpretationSettingsForm(SettingsForm):
 
     def save(self):
         # ponytail: login fields are POST-only; never write them to event.settings.
-        return self._save_excluding_fields(self._TRANSIENT_FIELDS)
+        was_enabled = is_interpretation_enabled(self.obj) if self.obj else True
+        result = self._save_excluding_fields(self._TRANSIENT_FIELDS)
+        enable_key = (
+            f"{self.prefix}-{SETTING_IS_ENABLED}" if self.prefix else SETTING_IS_ENABLED
+        )
+        if (
+            self.obj
+            and was_enabled
+            and not is_interpretation_enabled(self.obj)
+            and enable_key in self.data
+        ):
+            from .room_control import stop_all_event_sessions
+
+            stop_all_event_sessions(self.obj)
+        return result
 
     def save_pending_connect(self):
         """Persist URL before login; defer is_enabled until connect succeeds."""
@@ -205,3 +222,57 @@ class InterpretationSettingsForm(SettingsForm):
                 request,
                 _("Connection issue: %(message)s") % {"message": result.message},
             )
+
+
+class RoomInterpretationForm(forms.ModelForm):
+    """Per-room interpretation configuration.
+
+    ``target_languages`` is stored as a JSON list but edited as a
+    comma-separated string for convenience.
+    """
+
+    target_languages = forms.CharField(
+        required=False,
+        label=_("Caption languages"),
+        help_text=_(
+            "Comma-separated language codes attendees can read captions in, "
+            "e.g. de, fr."
+        ),
+        widget=forms.TextInput(attrs={"placeholder": "de, fr, es"}),
+    )
+
+    class Meta:
+        model = RoomInterpretation
+        fields = [
+            "interpreter",
+            "room_enabled",
+            "stream_url",
+            "target_languages",
+            "transcription_provider",
+            "translation_provider",
+        ]
+        widgets = {
+            "stream_url": forms.URLInput(
+                attrs={
+                    "placeholder": (
+                        "https://www.youtube.com/watch?v=… or https://…/stream.m3u8"
+                    )
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and isinstance(self.instance.target_languages, list):
+            self.initial["target_languages"] = ", ".join(self.instance.target_languages)
+
+    def clean_target_languages(self):
+        raw = self.cleaned_data.get("target_languages") or ""
+        codes = [c.strip() for c in raw.split(",") if c.strip()]
+        seen = set()
+        result = []
+        for code in codes:
+            if code not in seen:
+                seen.add(code)
+                result.append(code)
+        return result

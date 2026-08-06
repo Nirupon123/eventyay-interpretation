@@ -33,8 +33,13 @@ def is_interpretation_enabled(event: Event) -> bool:
     return event.settings.get(SETTING_IS_ENABLED, default=True, as_type=bool)
 
 
-def is_susi_configured(event: Event) -> bool:
+def is_susi_connected(event: Event) -> bool:
     return bool(get_base_url(event) and get_auth_token(event))
+
+
+def is_susi_configured(event: Event) -> bool:
+    """Whether SUSI credentials are available for rooms that select SUSI."""
+    return is_susi_connected(event)
 
 
 def save_susi_connection(
@@ -46,6 +51,9 @@ def save_susi_connection(
 
 
 def disconnect_susi(event: Event) -> None:
+    from .room_control import stop_all_event_sessions
+
+    stop_all_event_sessions(event)
     event.settings.set(SETTING_AUTH_TOKEN, "")
     event.settings.set(SETTING_SUSI_EMAIL, "")
     event.settings.set(SETTING_SUSI_NAME, "")

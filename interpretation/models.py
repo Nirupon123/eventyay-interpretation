@@ -4,23 +4,28 @@ from eventyay.base.models import LoggedModel
 
 
 class RoomInterpretation(LoggedModel):
-    """Interpretation configuration and session state for a single room.
+    """Per-room interpretation configuration and session state.
 
-    Each room maps to one SUSI transcription session, fed by the room's HLS
-    stream and translated into the configured target languages. Per-event SUSI
-    connection settings live in the event settings backend (see
+    Each room selects its own interpreter backend and runs sessions
+    independently. Event-level settings store shared credentials (see
     :mod:`interpretation.settings`).
     """
 
+    INTERPRETER_NONE = "none"
+    INTERPRETER_SUSI = "susi"
+    INTERPRETER_CHOICES = (
+        (INTERPRETER_NONE, _("None")),
+        (INTERPRETER_SUSI, _("SUSI Translator")),
+    )
+
     STATUS_IDLE = "idle"
     STATUS_RUNNING = "running"
+    # Legacy DB values; normalized to idle on read/write.
     STATUS_STOPPED = "stopped"
     STATUS_ERROR = "error"
     STATUS_CHOICES = (
         (STATUS_IDLE, _("Idle")),
         (STATUS_RUNNING, _("Running")),
-        (STATUS_STOPPED, _("Stopped")),
-        (STATUS_ERROR, _("Error")),
     )
 
     room = models.OneToOneField(
@@ -28,12 +33,26 @@ class RoomInterpretation(LoggedModel):
         on_delete=models.CASCADE,
         related_name="interpretation",
     )
-    hls_url = models.URLField(
-        verbose_name=_("HLS stream URL"),
+    interpreter = models.CharField(
+        verbose_name=_("Interpreter"),
+        max_length=32,
+        choices=INTERPRETER_CHOICES,
+        default=INTERPRETER_NONE,
+    )
+    room_enabled = models.BooleanField(
+        verbose_name=_("Interpretation enabled for room"),
+        default=False,
+        help_text=_(
+            "When enabled, this room can run interpretation using the "
+            "selected interpreter."
+        ),
+    )
+    stream_url = models.URLField(
+        verbose_name=_("Stream URL"),
         blank=True,
         help_text=_(
-            "HLS (.m3u8) URL of the room's audio/video stream that SUSI will "
-            "ingest. Defaults from the room's stream configuration when empty."
+            "Stream URL that the interpreter will ingest (YouTube, HLS, Vimeo, …). "
+            "Defaults from the room configuration when empty."
         ),
     )
     source_language = models.CharField(
@@ -58,11 +77,16 @@ class RoomInterpretation(LoggedModel):
         max_length=50,
         blank=True,
     )
-    susi_session_id = models.CharField(
-        verbose_name=_("SUSI session/tenant ID"),
+    backend_config = models.JSONField(
+        verbose_name=_("Backend config"),
+        default=dict,
+        blank=True,
+    )
+    backend_session_id = models.CharField(
+        verbose_name=_("Backend session ID"),
         max_length=64,
         blank=True,
-        help_text=_("Tenant ID returned by SUSI when the session starts."),
+        help_text=_("Session/tenant ID returned by the active interpreter backend."),
     )
     status = models.CharField(
         verbose_name=_("Status"),
@@ -76,4 +100,7 @@ class RoomInterpretation(LoggedModel):
         verbose_name_plural = _("Room interpretations")
 
     def __str__(self):
-        return f"RoomInterpretation(room={self.room_id}, status={self.status})"
+        return (
+            f"RoomInterpretation(room={self.room_id}, "
+            f"interpreter={self.interpreter}, status={self.status})"
+        )
