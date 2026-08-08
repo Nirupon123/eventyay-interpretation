@@ -1,0 +1,46 @@
+{% load i18n %}
+<form method="post" class="interpretation-room-form" id="room-{{ entry.room.pk }}">
+    {% csrf_token %}
+    <input type="hidden" name="{{ room_id_key }}" value="{{ entry.room.pk }}">
+
+    <div class="interpretation-room-panel-grid">
+        <div class="form-group">
+            <label for="{{ entry.configure_form.interpreter.id_for_label }}">
+                {{ entry.configure_form.interpreter.label }}
+            </label>
+            {{ entry.configure_form.interpreter }}
+        </div>
+
+        {% if entry.data.interpreter != "none" and not entry.interpreter_configured %}
+            <p class="text-warning interpretation-section-hint">
+                {% blocktrans trimmed %}
+                    This interpreter is not configured for the event yet.
+                {% endblocktrans %}
+                <a href="{{ interpreters_url }}">{% trans "Configure interpreters" %}</a>
+            </p>
+        {% endif %}
+
+        <div class="form-group">
+            <div class="checkbox">
+                <label>
+                    {{ entry.configure_form.room_enabled }}
+                    {{ entry.configure_form.room_enabled.label }}
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="interpretation-room-form-actions">
+        <button type="submit" name="{{ room_action_key }}" value="save" class="btn btn-default">
+            {% trans "Save" %}
+        </button>
+        {% if entry.data.status == "running" %}
+            <button type="submit" name="{{ room_action_key }}" value="stop" class="btn btn-warning">
+                {% trans "Stop session" %}
+            </button>
+        {% endif %}
+        <button type="submit" name="{{ room_action_key }}" value="disconnect" class="btn btn-link">
+            {% trans "Clear room" %}
+        </button>
+    </div>
+</form>

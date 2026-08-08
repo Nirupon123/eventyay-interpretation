@@ -7,8 +7,9 @@ class RoomInterpretation(LoggedModel):
     """Per-room interpretation configuration and session state.
 
     Each room selects its own interpreter backend and runs sessions
-    independently. Event-level settings store shared credentials (see
-    :mod:`interpretation.settings`).
+    independently. Event-level settings store interpreter sign-in credentials
+    and the feature toggle (see :mod:`interpretation.settings` and
+    :mod:`interpretation.interpreter_credentials`).
     """
 
     INTERPRETER_NONE = "none"

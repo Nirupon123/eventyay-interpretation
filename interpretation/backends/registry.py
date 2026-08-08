@@ -16,7 +16,7 @@ def get_backend(interpreter_id: str):
     return _BACKENDS.get(interpreter_id, _BACKENDS[INTERPRETER_NONE])
 
 
-def list_available_interpreters(event) -> list[dict]:
+def list_available_interpreters(event=None) -> list[dict]:
     return [
         {
             "id": backend.id,

@@ -1,38 +1,58 @@
-"""POST tests for the interpretation dashboard (save / save-and-test)."""
+"""POST tests for event-level interpreter credentials and room settings."""
 
 import pytest
 from django.contrib.messages import get_messages
 from django.test import override_settings
 
-from interpretation.forms import TEST_POST_KEY
-from interpretation.settings import (
-    get_auth_token,
-    get_base_url,
+from interpretation.interpreter_credentials import (
+    get_susi_auth_token,
+    is_susi_configured,
 )
 from interpretation.susi import SusiResult
+from tests.conftest import SUSI_EVENT_CREDENTIALS, susi_connect_payload
 
 pytestmark = pytest.mark.django_db
 
+SUSI_CLIENT = "interpretation.interpreter_credentials.SusiClient"
+
 
 @override_settings(SITE_URL="https://testserver")
-def test_save_persists_connection(
-    organizer_client, connected_event, dashboard_url, connection_payload
+def test_interpreter_connect_stores_event_credentials(
+    organizer_client,
+    event,
+    interpreters_url,
+    monkeypatch,
 ):
-    response = organizer_client.post(dashboard_url, connection_payload)
+    from interpretation.susi import SusiLoginResult
+
+    def fake_login(self, email, password):
+        return SusiLoginResult(
+            token="jwt-test-token",
+            email=email,
+            name="SUSI User",
+        )
+
+    monkeypatch.setattr("interpretation.forms.SusiClient.login", fake_login)
+
+    response = organizer_client.post(interpreters_url, susi_connect_payload())
 
     assert response.status_code == 302
-    connected_event.refresh_from_db()
-    connected_event.settings.flush()
-    assert get_base_url(connected_event) == "https://susi.example.com"
-    assert get_auth_token(connected_event) == "jwt-test-token"
+    from eventyay.base.models import Event
+
+    event = Event.objects.get(pk=event.pk)
+    assert is_susi_configured(event)
+    assert get_susi_auth_token(event) == "jwt-test-token"
 
     messages = [str(message) for message in get_messages(response.wsgi_request)]
-    assert any("saved" in message.lower() for message in messages)
+    assert any("connected" in message.lower() for message in messages)
 
 
 @override_settings(SITE_URL="https://testserver")
-def test_save_and_test_calls_verify_with_saved_token(
-    monkeypatch, organizer_client, connected_event, dashboard_url, connection_payload
+def test_interpreter_test_calls_verify_with_event_token(
+    monkeypatch,
+    organizer_client,
+    connected_event,
+    interpreters_url,
 ):
     calls = []
 
@@ -48,10 +68,15 @@ def test_save_and_test_calls_verify_with_saved_token(
                 message="Connected and authenticated.",
             )
 
-    monkeypatch.setattr("interpretation.forms.SusiClient", FakeSusiClient)
+    monkeypatch.setattr(SUSI_CLIENT, FakeSusiClient)
 
-    payload = {**connection_payload, TEST_POST_KEY: "1"}
-    response = organizer_client.post(dashboard_url, payload)
+    response = organizer_client.post(
+        interpreters_url,
+        {
+            "interpretation_interpreter_id": "susi",
+            "interpretation_interpreter_action": "test",
+        },
+    )
 
     assert response.status_code == 302
     assert calls == [("https://susi.example.com", "jwt-test-token")]
@@ -61,8 +86,11 @@ def test_save_and_test_calls_verify_with_saved_token(
 
 
 @override_settings(SITE_URL="https://testserver")
-def test_save_and_test_warns_when_verify_rejects_token(
-    monkeypatch, organizer_client, connected_event, dashboard_url, connection_payload
+def test_interpreter_test_warns_when_verify_rejects_token(
+    monkeypatch,
+    organizer_client,
+    connected_event,
+    interpreters_url,
 ):
     class FakeSusiClient:
         def __init__(self, base_url, auth_token="", timeout=10):
@@ -77,15 +105,21 @@ def test_save_and_test_warns_when_verify_rejects_token(
                 message="Server reachable but token is invalid or expired.",
             )
 
-    monkeypatch.setattr("interpretation.forms.SusiClient", FakeSusiClient)
+    monkeypatch.setattr(SUSI_CLIENT, FakeSusiClient)
 
-    payload = {**connection_payload, TEST_POST_KEY: "1"}
-    response = organizer_client.post(dashboard_url, payload)
+    response = organizer_client.post(
+        interpreters_url,
+        {
+            "interpretation_interpreter_id": "susi",
+            "interpretation_interpreter_action": "test",
+        },
+    )
 
     assert response.status_code == 302
-    connected_event.refresh_from_db()
-    connected_event.settings.flush()
-    assert get_auth_token(connected_event) == "jwt-test-token"
+    assert (
+        get_susi_auth_token(connected_event)
+        == SUSI_EVENT_CREDENTIALS["interpretation_susi_auth_token"]
+    )
 
     messages = [str(message) for message in get_messages(response.wsgi_request)]
     assert any("connection issue" in message.lower() for message in messages)
@@ -93,8 +127,11 @@ def test_save_and_test_warns_when_verify_rejects_token(
 
 
 @override_settings(SITE_URL="https://testserver")
-def test_test_connection_without_url_shows_error(
-    monkeypatch, organizer_client, connected_event, dashboard_url
+def test_interpreter_test_without_credentials_shows_error(
+    monkeypatch,
+    organizer_client,
+    event,
+    interpreters_url,
 ):
     calls = []
 
@@ -102,11 +139,17 @@ def test_test_connection_without_url_shows_error(
         def __init__(self, *args, **kwargs):
             calls.append(True)
 
-    monkeypatch.setattr("interpretation.forms.SusiClient", FakeSusiClient)
+    monkeypatch.setattr(SUSI_CLIENT, FakeSusiClient)
 
-    response = organizer_client.post(dashboard_url, {TEST_POST_KEY: "1"})
+    response = organizer_client.post(
+        interpreters_url,
+        {
+            "interpretation_interpreter_id": "susi",
+            "interpretation_interpreter_action": "test",
+        },
+    )
 
     assert response.status_code == 302
     assert calls == []
     messages = [str(message) for message in get_messages(response.wsgi_request)]
-    assert any("url" in message.lower() for message in messages)
+    assert any("sign in" in message.lower() for message in messages)

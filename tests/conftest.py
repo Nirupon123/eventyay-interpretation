@@ -10,6 +10,19 @@ os.environ.setdefault("EVY_RUNNING_ENVIRONMENT", "testing")
 
 User = get_user_model()
 
+SUSI_EVENT_CREDENTIALS = {
+    "interpretation_susi_base_url": "https://susi.example.com",
+    "interpretation_susi_auth_token": "jwt-test-token",
+    "interpretation_susi_account_email": "susi@example.com",
+    "interpretation_susi_account_name": "SUSI User",
+}
+
+
+@pytest.fixture(autouse=True)
+def align_site_url_with_test_client(settings):
+    # ponytail: test client host is testserver; middleware redirects otherwise.
+    settings.SITE_URL = "https://testserver"
+
 
 @pytest.fixture
 def user(db):
@@ -84,14 +97,62 @@ def dashboard_url(event):
 
 
 @pytest.fixture
+def rooms_url(event):
+    from django.urls import reverse
+
+    return reverse(
+        "plugins:interpretation:rooms",
+        kwargs={"organizer": event.organizer.slug, "event": event.slug},
+    )
+
+
+@pytest.fixture
+def interpreters_url(event):
+    from django.urls import reverse
+
+    return reverse(
+        "plugins:interpretation:interpreters",
+        kwargs={"organizer": event.organizer.slug, "event": event.slug},
+    )
+
+
+@pytest.fixture
+def room(event):
+    from eventyay.base.models import Room
+
+    return Room.objects.create(event=event, name="Main Stage")
+
+
+def apply_susi_event_credentials(event):
+    for key, value in SUSI_EVENT_CREDENTIALS.items():
+        event.settings.set(key, value)
+
+
+@pytest.fixture
 def connected_event(event):
-    event.settings.set("interpretation_auth_token", "jwt-test-token")
-    event.settings.set("interpretation_susi_email", "susi@example.com")
+    apply_susi_event_credentials(event)
     return event
 
 
 @pytest.fixture
-def connection_payload():
+def connected_room(room, connected_event):
+    from interpretation.models import RoomInterpretation
+
+    RoomInterpretation.objects.create(
+        room=room,
+        interpreter=RoomInterpretation.INTERPRETER_SUSI,
+        room_enabled=True,
+    )
+    return room
+
+
+def susi_connect_payload(**extra):
     return {
-        "interpretation-interpretation_base_url": "https://susi.example.com",
+        "interpretation_interpreter_id": "susi",
+        "interpretation_interpreter_action": "connect",
+        "interpretation_base_url": "https://susi.example.com",
+        "susi_connect_email": "susi@example.com",
+        "susi_connect_password": "secret",
+        "interpretation_connect": "1",
+        **extra,
     }
