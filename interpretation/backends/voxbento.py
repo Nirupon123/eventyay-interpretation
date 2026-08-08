@@ -72,6 +72,23 @@ class VoxbentoBackend(InterpreterBackend):
             except requests.RequestException:
                 pass
 
+        # Find languages that were removed and delete them from VoxBento
+        removed_langs = [
+            lang
+            for lang in booths.keys()
+            if lang not in interpretation.target_languages
+        ]
+        for lang in removed_langs:
+            delete_url = (
+                f"{base_url.rstrip('/')}/api/events/{event.slug}/"
+                f"rooms/{interpretation.room_id}/booths/{lang}"
+            )
+            try:
+                requests.delete(delete_url, headers=headers, timeout=5.0)
+            except requests.RequestException:
+                pass
+            booths.pop(lang, None)
+
         config["booths"] = booths
         interpretation.backend_config = config
         interpretation.save(update_fields=["backend_config"])
