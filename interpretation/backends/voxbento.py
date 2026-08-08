@@ -39,7 +39,7 @@ class VoxbentoBackend(InterpreterBackend):
         if not base_url or not api_key:
             return
 
-        url = f"{base_url.rstrip('/')}/api/v1/events/{event.slug}/booths"
+        url = f"{base_url.rstrip('/')}/api/events/{event.slug}/booths"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -53,7 +53,9 @@ class VoxbentoBackend(InterpreterBackend):
         for lang in interpretation.target_languages:
             payload = {
                 "language_code": lang,
-                "room_id": interpretation.room.pk,
+                "language": lang.upper(),
+                "room_id": interpretation.room_id,
+                "room_name": str(interpretation.room.name),
             }
             try:
                 response = requests.post(
