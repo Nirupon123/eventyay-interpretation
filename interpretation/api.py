@@ -15,6 +15,7 @@ from .room_control import (
     stop_room_session,
     update_room_interpretation,
 )
+from .settings import use_plugin_language_streams
 
 PLUGIN_MODULE = "interpretation"
 
@@ -24,6 +25,7 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
 
     queryset = RoomInterpretation.objects.none()
     permission_classes = [EventPermission]
+    permission = "can_change_event_settings"
     write_permission = "can_change_event_settings"
     endpoint = "room_interpretation"
 
@@ -120,3 +122,15 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
                 )
         except requests.RequestException as e:
             return Response({"detail": f"Connection failed: {e}"}, status=400)
+
+    @action(detail=False, methods=["get"], url_path="streams")
+    def streams(self, request, room_pk=None, **kwargs):
+        room = self._ensure_room()
+        payload = serialize_room_interpretation(room, self.event)
+        return Response(
+            {
+                "use_plugin_language_streams": use_plugin_language_streams(self.event),
+                "language_streams": payload["language_streams"],
+                "attendee_language_streams": payload["attendee_language_streams"],
+            }
+        )

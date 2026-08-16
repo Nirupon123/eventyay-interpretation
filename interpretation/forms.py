@@ -12,7 +12,10 @@ from .interpreter_credentials import (
     save_susi_credentials,
     susi_account_label,
 )
-from .settings import SETTING_IS_ENABLED, is_interpretation_enabled
+from .settings import (
+    SETTING_IS_ENABLED,
+    is_interpretation_enabled,
+)
 from .susi import SusiClient, SusiError
 from .susi_providers import (
     DEFAULT_SUSI_TRANSCRIPTION_PROVIDER,
@@ -325,6 +328,15 @@ class InterpretationSettingsForm(SettingsForm):
     interpretation_is_enabled = forms.BooleanField(
         label=_("Enable live interpretation for this event"),
         required=False,
+    )
+    interpretation_use_plugin_streams = forms.BooleanField(
+        label=_("Use plugin language streams in the video room"),
+        required=False,
+        help_text=_(
+            "When enabled, the video room audio translation dropdown reads "
+            "language streams from this plugin instead of the core video "
+            "room module."
+        ),
     )
 
     def save(self):
