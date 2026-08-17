@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from .backends import (
@@ -15,8 +16,12 @@ from .interpreter_credentials import (
     SUSI_CREDENTIAL_KEYS,
     strip_room_credential_keys,
 )
+from .language_streams import (
+    attendee_language_streams,
+    validate_language_streams,
+)
 from .models import RoomInterpretation
-from .settings import is_interpretation_enabled
+from .settings import is_interpretation_enabled, use_plugin_language_streams
 from .susi import SusiError
 from .utils import (
     get_room_stream_url,
@@ -27,6 +32,17 @@ from .utils import (
 )
 
 PLUGIN_MODULE = "interpretation"
+
+
+def notify_video_room_config_changed(event) -> None:
+    """Push event.updated so video SPA reloads room config (plugin stream fields)."""
+    try:
+        from asgiref.sync import async_to_sync
+        from eventyay.base.services.event import notify_event_change
+
+        async_to_sync(notify_event_change)(event.id)
+    except Exception:
+        pass
 
 
 def plugin_enabled(event) -> bool:
@@ -83,6 +99,11 @@ def serialize_room_interpretation(room, event, interpretation=None) -> dict:
         interpreter = interpretation.interpreter
         room_enabled = interpretation.room_enabled
     backend = get_backend(interpreter)
+    stored_language_streams = (
+        list(getattr(interpretation, "language_streams", None) or [])
+        if interpretation
+        else []
+    )
     return {
         "interpreter": interpreter,
         "interpreter_label": str(backend.label),
@@ -105,6 +126,9 @@ def serialize_room_interpretation(room, event, interpretation=None) -> dict:
         "session_id": _public_session_id(interpretation),
         "stream_url": stream_url or detected_stream_url,
         "detected_stream_url": detected_stream_url,
+        "language_streams": stored_language_streams,
+        "attendee_language_streams": attendee_language_streams(stored_language_streams),
+        "use_plugin_language_streams": use_plugin_language_streams(event),
         "plugin_enabled": plugin_enabled(event),
         "dashboard_url": interpretation_dashboard_url(event.organizer.slug, event.slug),
     }
@@ -159,8 +183,19 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
             normalize_target_languages(data.get("target_languages"))
         )
 
+    if "language_streams" in data:
+        try:
+            interpretation.language_streams = validate_language_streams(
+                data.get("language_streams")
+            )
+        except ValidationError as exc:
+            raise ValueError(str(exc)) from exc
+
     _apply_backend_config(interpretation, data)
     interpretation.save()
+
+    if "language_streams" in data:
+        notify_video_room_config_changed(event)
 
     if was_running and (
         not interpretation.room_enabled
