@@ -18,17 +18,17 @@ def test_room_configure_form_lists_interpreters():
     form = RoomConfigureForm(event=_FakeEvent())
     ids = [choice[0] for choice in form.fields["interpreter"].choices]
     assert RoomInterpretation.INTERPRETER_NONE in ids
-    assert RoomInterpretation.INTERPRETER_SUSI in ids
+    assert RoomInterpretation.INTERPRETER_SUSI not in ids
 
 
 def test_room_configure_form_accepts_interpreter_and_enabled():
     form = RoomConfigureForm(
         event=_FakeEvent(),
         data={
-            "interpreter": RoomInterpretation.INTERPRETER_SUSI,
+            "interpreter": RoomInterpretation.INTERPRETER_VOXBENTO,
             "room_enabled": True,
         },
     )
     assert form.is_valid(), form.errors
-    assert form.cleaned_data["interpreter"] == RoomInterpretation.INTERPRETER_SUSI
+    assert form.cleaned_data["interpreter"] == RoomInterpretation.INTERPRETER_VOXBENTO
     assert form.cleaned_data["room_enabled"] is True

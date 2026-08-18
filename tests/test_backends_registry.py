@@ -41,7 +41,7 @@ def test_susi_backend_exposes_event_credentials():
 
 def test_list_configurable_interpreters_includes_susi(event):
     ids = {item["id"] for item in list_configurable_interpreters(event)}
-    assert RoomInterpretation.INTERPRETER_SUSI in ids
+    assert RoomInterpretation.INTERPRETER_SUSI not in ids
 
 
 def test_all_room_credential_keys_includes_legacy_susi_keys():

@@ -1,7 +1,4 @@
-from asgiref.sync import sync_to_async
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
-from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -15,33 +12,21 @@ from .forms import (
     EVENT_SETTINGS_SAVE_KEY,
     INTERPRETER_ACTION_KEY,
     INTERPRETER_ID_KEY,
-    PREVIEW_ACTION_KEY,
-    PREVIEW_SAVE,
-    PREVIEW_START,
-    PREVIEW_STOP,
     ROOM_ACTION_KEY,
     ROOM_ID_KEY,
-    CaptionPreviewSettingsForm,
     InterpretationSettingsForm,
     RoomConfigureForm,
-    preview_settings_payload,
     room_form_prefix,
 )
 from .interpreter_credentials import (
     clear_interpreter_credentials,
-    get_susi_client,
     is_interpreter_configured,
-    is_susi_configured,
 )
 from .models import RoomInterpretation
-from .preview_stream import stream_susi_captions_async
 from .room_control import (
     clear_room_interpretation_setup,
-    get_interpretation,
-    normalize_session_status,
     notify_video_room_config_changed,
     serialize_room_interpretation,
-    start_room_session,
     stop_room_session,
     update_room_interpretation,
 )
@@ -379,221 +364,8 @@ class InterpretationRoomSettings(
             "rooms": rooms,
             "available_interpreters": list_available_interpreters(event),
             "interpreters_url": _interpreters_url(event),
-            "susi_connected": is_susi_configured(event),
             "is_event_settings": True,
             **kwargs,
         }
 
 
-def _preview_caption_text(data: dict | None) -> str:
-    if not data:
-        return ""
-    return (data.get("transcript") or data.get("translation") or "").strip()
-
-
-def _preview_session(room, event):
-    interpretation = get_interpretation(room)
-    if interpretation is None:
-        return None, False
-    is_running = (
-        interpretation.interpreter == RoomInterpretation.INTERPRETER_SUSI
-        and normalize_session_status(interpretation.status)
-        == RoomInterpretation.STATUS_RUNNING
-        and bool(interpretation.backend_session_id)
-    )
-    return interpretation, is_running
-
-
-def _preview_settings_form(room, event, data=None):
-    interpretation = get_interpretation(room)
-    return CaptionPreviewSettingsForm(
-        data=data,
-        interpretation=interpretation,
-    )
-
-
-def _apply_preview_settings(request, room, event):
-    form = _preview_settings_form(room, event, data=request.POST)
-    if not form.is_valid():
-        return None, form
-    try:
-        update_room_interpretation(room, event, preview_settings_payload(form))
-    except ValueError as exc:
-        return None, str(exc)
-    return form, None
-
-
-class InterpretationCaptionPreview(
-    InterpretationEnabledMixin,
-    EventSettingsViewMixin,
-    EventPermissionRequiredMixin,
-    View,
-):
-    """Temporary organizer page to verify SUSI captions reach Eventyay."""
-
-    template_name = "interpretation/caption_preview.html"
-    permission = "can_change_event_settings"
-
-    def _room(self, event, pk):
-        return get_object_or_404(event.rooms.filter(deleted=False), pk=pk)
-
-    def _preview_url(self, room):
-        return reverse(
-            "plugins:interpretation:room.preview",
-            kwargs={
-                "organizer": self.request.event.organizer.slug,
-                "event": self.request.event.slug,
-                "pk": room.pk,
-            },
-        )
-
-    def get(self, request, pk, *args, **kwargs):
-        event = request.event
-        room = self._room(event, pk)
-        return render(request, self.template_name, self._context(request, event, room))
-
-    def post(self, request, pk, *args, **kwargs):
-        event = request.event
-        room = self._room(event, pk)
-        action = request.POST.get(PREVIEW_ACTION_KEY)
-        redirect_url = self._preview_url(room)
-
-        if action == PREVIEW_SAVE:
-            _settings, error = _apply_preview_settings(request, room, event)
-            if error is not None:
-                if isinstance(error, str):
-                    messages.error(request, error)
-                else:
-                    messages.error(
-                        request,
-                        _("Could not save preview settings. Check the fields below."),
-                    )
-            else:
-                messages.success(request, _("Saved preview settings."))
-        elif action == PREVIEW_START:
-            _settings, error = _apply_preview_settings(request, room, event)
-            if error is not None:
-                if isinstance(error, str):
-                    messages.error(request, error)
-                else:
-                    messages.error(
-                        request,
-                        _("Could not start the session. Check the settings below."),
-                    )
-                return redirect(redirect_url)
-            result = start_room_session(room, event)
-            if result.ok:
-                messages.success(
-                    request,
-                    _("Started interpretation session for %(room)s.")
-                    % {"room": room.name},
-                )
-            else:
-                messages.error(request, result.error)
-        elif action == PREVIEW_STOP:
-            result = stop_room_session(room, event)
-            _notify_stop_result(request, room, result)
-        else:
-            messages.error(request, _("Unknown preview action."))
-
-        return redirect(redirect_url)
-
-    def _context(self, request, event, room):
-        interpretation, is_running = _preview_session(room, event)
-        data = serialize_room_interpretation(room, event, interpretation)
-        return {
-            "event": event,
-            "room": room,
-            "data": data,
-            "preview_form": _preview_settings_form(room, event),
-            "preview_action_key": PREVIEW_ACTION_KEY,
-            "is_running": is_running,
-            "preview_supported": data.get("interpreter")
-            == RoomInterpretation.INTERPRETER_SUSI,
-            "stream_url": reverse(
-                "plugins:interpretation:room.preview.stream",
-                kwargs={
-                    "organizer": event.organizer.slug,
-                    "event": event.slug,
-                    "pk": room.pk,
-                },
-            ),
-            "rooms_url": _rooms_url(event),
-            "interpreters_url": _interpreters_url(event),
-            "is_event_settings": True,
-        }
-
-
-def _preview_sse(message: str, *, error: bool = False) -> StreamingHttpResponse:
-    import json
-
-    payload = (
-        {"status": "error", "message": message} if error else {"status": "connected"}
-    )
-    body = f"data: {json.dumps(payload)}\n\n".encode()
-    return StreamingHttpResponse(
-        [body], content_type="text/event-stream; charset=utf-8"
-    )
-
-
-def _preview_stream_response(stream) -> StreamingHttpResponse:
-    response = StreamingHttpResponse(
-        stream, content_type="text/event-stream; charset=utf-8"
-    )
-    response["Cache-Control"] = "no-cache, no-transform"
-    response["X-Accel-Buffering"] = "no"
-    return response
-
-
-def _load_preview_stream(event, pk):
-    """Sync ORM/auth lookup for preview stream (call via sync_to_async)."""
-    room = get_object_or_404(event.rooms.filter(deleted=False), pk=pk)
-    interpretation, is_running = _preview_session(room, event)
-    if interpretation is None or not is_running:
-        return None, None, str(_("Session is not running."))
-    client = get_susi_client(event)
-    if not client.auth_token:
-        return None, None, str(_("SUSI is not connected for this event."))
-    return client, interpretation.backend_session_id, None
-
-
-class InterpretationCaptionPreviewStream(View):
-    """Proxy SUSI caption SSE to the organizer preview page (async for Daphne)."""
-
-    permission = "can_change_event_settings"
-    http_method_names = ["get"]
-
-    async def dispatch(self, request, *args, **kwargs):
-        if PLUGIN_MODULE not in request.event.get_plugins():
-            return redirect(
-                "eventyay_common:event.plugins",
-                organizer=request.event.organizer.slug,
-                event=request.event.slug,
-            )
-        if not request.user.is_authenticated:
-            raise PermissionDenied()
-        allowed = await sync_to_async(
-            request.user.has_event_permission,
-            thread_sensitive=True,
-        )(request.organizer, request.event, self.permission, request=request)
-        if not allowed:
-            raise PermissionDenied(
-                _("You do not have permission to view this content.")
-            )
-        self.setup(request, *args, **kwargs)
-        method = request.method.lower()
-        if method not in self.http_method_names:
-            return await self.http_method_not_allowed(request, *args, **kwargs)
-        handler = getattr(self, method, None)
-        if handler is None:
-            return await self.http_method_not_allowed(request, *args, **kwargs)
-        return await handler(request, *args, **kwargs)
-
-    async def get(self, request, pk, *args, **kwargs):
-        client, tenant_id, error = await sync_to_async(
-            _load_preview_stream,
-            thread_sensitive=True,
-        )(request.event, pk)
-        if error:
-            return _preview_sse(error, error=True)
-        return _preview_stream_response(stream_susi_captions_async(client, tenant_id))

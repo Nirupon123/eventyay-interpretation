@@ -4,8 +4,6 @@ from eventyay.common.urls import OrganizerSlugConverter  # noqa: F401
 
 from .api import RoomInterpretationViewSet
 from .views import (
-    InterpretationCaptionPreview,
-    InterpretationCaptionPreviewStream,
     InterpretationInterpreters,
     InterpretationOverview,
     InterpretationRoomSettings,
@@ -34,15 +32,5 @@ urlpatterns = [
         _PREFIX + "rooms/",
         InterpretationRoomSettings.as_view(),
         name="rooms",
-    ),
-    path(
-        _PREFIX + "rooms/<int:pk>/preview/",
-        InterpretationCaptionPreview.as_view(),
-        name="room.preview",
-    ),
-    path(
-        _PREFIX + "rooms/<int:pk>/preview/stream/",
-        InterpretationCaptionPreviewStream.as_view(),
-        name="room.preview.stream",
     ),
 ]
