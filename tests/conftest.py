@@ -131,6 +131,7 @@ def apply_susi_event_credentials(event):
 @pytest.fixture
 def connected_event(event):
     apply_susi_event_credentials(event)
+    apply_voxbento_event_credentials(event)
     return event
 
 
@@ -140,7 +141,7 @@ def connected_room(room, connected_event):
 
     RoomInterpretation.objects.create(
         room=room,
-        interpreter=RoomInterpretation.INTERPRETER_SUSI,
+        interpreter=RoomInterpretation.INTERPRETER_VOXBENTO,
         room_enabled=True,
     )
     return room
@@ -156,3 +157,13 @@ def susi_connect_payload(**extra):
         "interpretation_connect": "1",
         **extra,
     }
+
+VOXBENTO_EVENT_CREDENTIALS = {
+    "interpretation_voxbento_base_url": "https://voxbento.example.com",
+    "interpretation_voxbento_api_key": "jwt-test-token",
+}
+
+def apply_voxbento_event_credentials(event):
+    for key, value in VOXBENTO_EVENT_CREDENTIALS.items():
+        event.settings.set(key, value)
+

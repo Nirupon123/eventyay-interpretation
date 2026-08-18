@@ -52,6 +52,7 @@ def list_available_interpreters(event=None) -> list[dict]:
             "uses_event_credentials": backend.uses_event_credentials,
         }
         for backend in _BACKENDS.values()
+        if backend.id != INTERPRETER_SUSI
     ]
 
 
