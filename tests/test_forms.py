@@ -1,15 +1,7 @@
 """Tests for event-level and per-room interpretation forms."""
 
 from interpretation.forms import (
-    CONNECT_POST_KEY,
     InterpretationSettingsForm,
-)
-from interpretation.interpreter_credentials import (
-    SETTING_SUSI_AUTH_TOKEN,
-    SETTING_SUSI_BASE_URL,
-    get_susi_auth_token,
-    get_susi_base_url,
-    is_susi_configured,
 )
 from interpretation.settings import SETTING_IS_ENABLED
 
@@ -87,5 +79,3 @@ def test_event_disable_stops_sessions(monkeypatch):
     assert form.is_valid(), form.errors
     form.save()
     assert stopped == [form.obj]
-
-

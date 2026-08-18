@@ -130,9 +130,6 @@ class VoxbentoInterpreterCredentialsForm(forms.Form):
         return True
 
 
-
-
-
 def room_form_prefix(room_id: int) -> str:
     return f"room-{room_id}"
 
@@ -164,9 +161,6 @@ class RoomConfigureForm(forms.Form):
         for name, field in self.fields.items():
             if name != "room_enabled":
                 field.widget.attrs.setdefault("class", "form-control")
-
-
-
 
 
 class InterpretationSettingsForm(SettingsForm):
@@ -203,5 +197,3 @@ class InterpretationSettingsForm(SettingsForm):
 
             stop_all_event_sessions(self.obj)
         return result
-
-

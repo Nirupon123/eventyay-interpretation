@@ -8,7 +8,7 @@ from .settings import use_plugin_language_streams
 
 
 def augment_room_config(room, room_config: dict) -> None:
-    event = getattr(room, 'event', None)
+    event = getattr(room, "event", None)
     if event is None:
         return
     if not plugin_enabled(event):
