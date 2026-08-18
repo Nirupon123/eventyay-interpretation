@@ -115,3 +115,21 @@ class RoomInterpretation(LoggedModel):
             f"RoomInterpretation(room={self.room_id}, "
             f"interpreter={self.interpreter}, status={self.status})"
         )
+
+
+class VoxbentoOAuthGrant(LoggedModel):
+    """Stores OAuth2 tokens for VoxBento integration per event."""
+
+    event = models.OneToOneField(
+        "base.Event",
+        on_delete=models.CASCADE,
+        related_name="voxbento_oauth_grant",
+    )
+    access_token = models.CharField(max_length=2048, blank=True)
+    refresh_token = models.CharField(max_length=2048, blank=True)
+    scopes = models.CharField(max_length=255, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("VoxBento OAuth Grant")
+        verbose_name_plural = _("VoxBento OAuth Grants")

@@ -367,5 +367,3 @@ class InterpretationRoomSettings(
             "is_event_settings": True,
             **kwargs,
         }
-
-

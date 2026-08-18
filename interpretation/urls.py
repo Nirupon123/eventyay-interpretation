@@ -8,6 +8,7 @@ from .views import (
     InterpretationOverview,
     InterpretationRoomSettings,
 )
+from .views_oauth import VoxbentoOAuthCallbackView, VoxbentoOAuthConnectView
 
 room_router.register(
     "interpretation",
@@ -32,5 +33,15 @@ urlpatterns = [
         _PREFIX + "rooms/",
         InterpretationRoomSettings.as_view(),
         name="rooms",
+    ),
+    path(
+        _PREFIX + "voxbento/connect/",
+        VoxbentoOAuthConnectView.as_view(),
+        name="oauth_connect",
+    ),
+    path(
+        _PREFIX + "voxbento/callback/",
+        VoxbentoOAuthCallbackView.as_view(),
+        name="oauth_callback",
     ),
 ]

@@ -158,12 +158,13 @@ def susi_connect_payload(**extra):
         **extra,
     }
 
+
 VOXBENTO_EVENT_CREDENTIALS = {
     "interpretation_voxbento_base_url": "https://voxbento.example.com",
     "interpretation_voxbento_api_key": "jwt-test-token",
 }
 
+
 def apply_voxbento_event_credentials(event):
     for key, value in VOXBENTO_EVENT_CREDENTIALS.items():
         event.settings.set(key, value)
-
