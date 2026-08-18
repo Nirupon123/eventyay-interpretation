@@ -4,12 +4,11 @@ from eventyay.common.urls import OrganizerSlugConverter  # noqa: F401
 
 from .api import RoomInterpretationViewSet
 from .views import (
-    InterpretationCaptionPreview,
-    InterpretationCaptionPreviewStream,
     InterpretationInterpreters,
     InterpretationOverview,
     InterpretationRoomSettings,
 )
+from .views_oauth import VoxbentoOAuthCallbackView, VoxbentoOAuthConnectView
 
 room_router.register(
     "interpretation",
@@ -36,13 +35,13 @@ urlpatterns = [
         name="rooms",
     ),
     path(
-        _PREFIX + "rooms/<int:pk>/preview/",
-        InterpretationCaptionPreview.as_view(),
-        name="room.preview",
+        _PREFIX + "voxbento/connect/",
+        VoxbentoOAuthConnectView.as_view(),
+        name="oauth_connect",
     ),
     path(
-        _PREFIX + "rooms/<int:pk>/preview/stream/",
-        InterpretationCaptionPreviewStream.as_view(),
-        name="room.preview.stream",
+        _PREFIX + "voxbento/callback/",
+        VoxbentoOAuthCallbackView.as_view(),
+        name="oauth_callback",
     ),
 ]
