@@ -30,6 +30,7 @@ from .room_control import (
     stop_room_session,
     update_room_interpretation,
 )
+from .backends.voxbento_oauth import VoxbentoTemporarilyUnavailable
 
 PLUGIN_MODULE = "interpretation"
 
@@ -121,6 +122,11 @@ class InterpretationOverview(
             "interpreters_url": _interpreters_url(event),
             **build_overview_context(event),
         }
+        
+        grant = getattr(event, 'voxbento_oauth_grant', None)
+        if grant and grant.needs_reauth:
+            messages.warning(request, _("VoxBento requires reauthorization. Please reconnect via the Configure interpreters page."))
+            
         return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
@@ -300,7 +306,11 @@ class InterpretationRoomSettings(
             and interpretation.interpreter == RoomInterpretation.INTERPRETER_VOXBENTO
         ):
             backend = get_backend(interpretation.interpreter)
-            backend.sync_booths(event, interpretation)
+            try:
+                backend.sync_booths(event, interpretation)
+            except VoxbentoTemporarilyUnavailable:
+                messages.error(request, _("VoxBento is temporarily unavailable. Please try saving again later."))
+                return redirect(redirect_url)
 
         messages.success(
             request,

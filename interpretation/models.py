@@ -2,6 +2,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from eventyay.base.models import LoggedModel
 
+from .fields import EncryptedTextField
+
 
 class RoomInterpretation(LoggedModel):
     """Per-room interpretation configuration and session state.
@@ -125,10 +127,13 @@ class VoxbentoOAuthGrant(LoggedModel):
         on_delete=models.CASCADE,
         related_name="voxbento_oauth_grant",
     )
-    access_token = models.CharField(max_length=2048, blank=True)
-    refresh_token = models.CharField(max_length=2048, blank=True)
+    access_token = EncryptedTextField(null=True, blank=True)
+    refresh_token = EncryptedTextField(null=True, blank=True)
     scopes = models.CharField(max_length=255, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
+    webhook_subscription_id = models.CharField(max_length=255, null=True, blank=True)
+    webhook_secret_key = EncryptedTextField(null=True, blank=True)
+    needs_reauth = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = _("VoxBento OAuth Grant")

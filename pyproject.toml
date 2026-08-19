@@ -14,6 +14,7 @@ maintainers = [
 
 dependencies = [
     "requests>=2.31.0",
+    "cryptography>=41.0.0",
 ]
 
 [project.entry-points."pretix.plugin"]
@@ -71,3 +72,13 @@ combine-as-imports = true
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
+
+[dependency-groups]
+dev = [
+    "cryptography>=50.0.0",
+    "django>=6.1",
+    "django-redis>=7.0.0",
+    "pytest>=9.1.1",
+    "pytest-django>=4.14.0",
+    "requests>=2.34.2",
+]

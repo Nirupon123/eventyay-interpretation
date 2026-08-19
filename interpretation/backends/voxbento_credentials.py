@@ -23,9 +23,18 @@ class VoxbentoError(Exception):
 
 
 def get_voxbento_base_url(event: Event) -> str:
-    return event.settings.get(
+    url = event.settings.get(
         SETTING_VOXBENTO_BASE_URL, default="", as_type=str
     ).strip()
+    
+    if not url:
+        return ""
+        
+    parsed = urlparse(url)
+    if parsed.scheme != "https" and parsed.netloc not in ("localhost", "127.0.0.1"):
+        raise VoxbentoError("VoxBento Base URL must use HTTPS unless running locally.")
+        
+    return url
 
 
 def get_voxbento_api_key(event: Event) -> str:

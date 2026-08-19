@@ -40,7 +40,7 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
         if not code:
             messages.error(request, _("OAuth authorization failed: No code provided."))
             kwargs = {"organizer": event.organizer.slug, "event": event.slug}
-        return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
+            return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
 
         client_id = "YOUR_CLIENT_ID"
         client_secret = "YOUR_CLIENT_SECRET"
@@ -64,6 +64,11 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
             )
             resp.raise_for_status()
             data = resp.json()
+            
+            from django.utils import timezone
+            from datetime import timedelta
+            expires_in = data.get("expires_in", 3600)
+            expires_at = timezone.now() + timedelta(seconds=expires_in)
 
             VoxbentoOAuthGrant.objects.update_or_create(
                 event=event,
@@ -71,6 +76,8 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
                     "access_token": data.get("access_token", ""),
                     "refresh_token": data.get("refresh_token", ""),
                     "scopes": data.get("scope", ""),
+                    "expires_at": expires_at,
+                    "needs_reauth": False,
                 },
             )
             messages.success(request, _("Successfully connected to VoxBento!"))
