@@ -11,6 +11,14 @@ from .voxbento_credentials import (
     is_voxbento_configured,
     voxbento_server_host,
 )
+from .voxbento_oauth import (
+    VoxbentoReauthorizationRequired,
+    VoxbentoTemporarilyUnavailable,
+    get_valid_access_token,
+)
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class VoxbentoBackend(InterpreterBackend):
@@ -35,15 +43,31 @@ class VoxbentoBackend(InterpreterBackend):
             return
 
         base_url = get_voxbento_base_url(event)
-        api_key = get_voxbento_api_key(event)
-        if not base_url or not api_key:
+        if not base_url:
+            return
+            
+        grant = getattr(event, 'voxbento_oauth_grant', None)
+        try:
+            access_token = get_valid_access_token(grant.id) if grant else None
+        except VoxbentoReauthorizationRequired:
+            access_token = None
+        
+        if access_token:
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            }
+        elif legacy_key := get_voxbento_api_key(event):
+            logger.warning("event=%s using deprecated VoxBento API key auth — reconnect via OAuth", event.slug)
+            headers = {
+                "Authorization": f"Bearer {legacy_key}",
+                "Content-Type": "application/json",
+            }
+        else:
+            logger.error("event=%s has no VoxBento credentials configured", event.slug)
             return
 
         url = f"{base_url.rstrip('/')}/api/v1/events/{event.slug}/booths"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
 
         config = interpretation.backend_config.copy()
         booths = config.get("booths", {})
