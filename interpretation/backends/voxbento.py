@@ -127,7 +127,9 @@ class VoxbentoBackend(InterpreterBackend):
         clear_voxbento_credentials(event)
 
     def credentials_account_label(self, event) -> str:
-        # VoxBento doesn't use "accounts", just API keys.
+        from ..models import VoxbentoOAuthGrant
+        if VoxbentoOAuthGrant.objects.filter(event=event).exists():
+            return _("VoxBento OAuth Connection")
         return _("VoxBento API Key")
 
     def credentials_server_label(self, event) -> str:

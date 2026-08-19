@@ -65,6 +65,8 @@ def save_voxbento_credentials(event: Event, base_url: str, api_key: str) -> None
 def clear_voxbento_credentials(event: Event) -> None:
     for key in EVENT_SETTINGS_KEYS:
         event.settings.delete(key)
+    from ..models import VoxbentoOAuthGrant
+    VoxbentoOAuthGrant.objects.filter(event=event).delete()
 
 
 def voxbento_server_host(event: Event) -> str:

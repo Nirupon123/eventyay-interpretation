@@ -33,6 +33,16 @@ from .backends.voxbento_credentials import (
 
 def verify_voxbento_connection(event, request) -> None:
     """Verify stored event-level VoxBento credentials."""
+    from .models import VoxbentoOAuthGrant
+    grant = VoxbentoOAuthGrant.objects.filter(event=event).first()
+    if grant:
+        messages.success(
+            request,
+            _("Successfully connected to VoxBento at %(server)s via OAuth 2.0.")
+            % {"server": voxbento_server_host(event)},
+        )
+        return
+
     base_url = get_voxbento_base_url(event)
     api_key = get_voxbento_api_key(event)
     if not base_url or not api_key:
