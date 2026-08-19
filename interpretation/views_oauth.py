@@ -14,15 +14,19 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         event = self.request.event
-        # In a real setup, client_id and redirect_uri come from eventyay settings
-        # We assume they are set via environment or plugin settings
-        client_id = "YOUR_CLIENT_ID"
+        from django.conf import settings
+        client_id = getattr(settings, "VOXBENTO_OAUTH_CLIENT_ID", "")
         kwargs = {"organizer": event.organizer.slug, "event": event.slug}
         redirect_uri = self.request.build_absolute_uri(
             reverse("plugins:interpretation:oauth_callback", kwargs=kwargs)
         )
 
-        voxbento_base = "http://localhost:8001"
+        from .backends.voxbento_credentials import get_voxbento_base_url
+        voxbento_base = get_voxbento_base_url(event)
+        if not voxbento_base:
+            messages.error(request, _("Please configure the VoxBento Base URL in Interpreter settings first."))
+            return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
+            
         auth_url = (
             f"{voxbento_base}/oauth/authorize?response_type=code"
             f"&client_id={client_id}&redirect_uri={redirect_uri}"
@@ -42,13 +46,18 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
             kwargs = {"organizer": event.organizer.slug, "event": event.slug}
             return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
 
-        client_id = "YOUR_CLIENT_ID"
-        client_secret = "YOUR_CLIENT_SECRET"
+        from django.conf import settings
+        client_id = getattr(settings, "VOXBENTO_OAUTH_CLIENT_ID", "")
+        client_secret = getattr(settings, "VOXBENTO_OAUTH_CLIENT_SECRET", "")
         kwargs = {"organizer": event.organizer.slug, "event": event.slug}
         redirect_uri = self.request.build_absolute_uri(
             reverse("plugins:interpretation:oauth_callback", kwargs=kwargs)
         )
-        voxbento_base = "http://localhost:8001"
+        from .backends.voxbento_credentials import get_voxbento_base_url
+        voxbento_base = get_voxbento_base_url(event)
+        if not voxbento_base:
+            messages.error(request, _("VoxBento Base URL is not configured."))
+            return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
 
         try:
             resp = requests.post(

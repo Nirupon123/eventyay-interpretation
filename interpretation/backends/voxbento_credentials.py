@@ -31,7 +31,7 @@ def get_voxbento_base_url(event: Event) -> str:
         return ""
         
     parsed = urlparse(url)
-    if parsed.scheme != "https" and parsed.netloc not in ("localhost", "127.0.0.1"):
+    if parsed.scheme != "https" and parsed.hostname not in ("localhost", "127.0.0.1"):
         raise VoxbentoError("VoxBento Base URL must use HTTPS unless running locally.")
         
     return url
