@@ -9,6 +9,7 @@ from .views import (
     InterpretationRoomSettings,
 )
 from .views_oauth import VoxbentoOAuthCallbackView, VoxbentoOAuthConnectView
+from .views_webhooks import VoxbentoWebhookReceiverView
 
 room_router.register(
     "interpretation",
@@ -43,5 +44,10 @@ urlpatterns = [
         _PREFIX + "voxbento/callback/",
         VoxbentoOAuthCallbackView.as_view(),
         name="oauth_callback",
+    ),
+    path(
+        "interpretation/voxbento/webhook/",
+        VoxbentoWebhookReceiverView.as_view(),
+        name="voxbento_webhook",
     ),
 ]

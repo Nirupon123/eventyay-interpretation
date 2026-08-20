@@ -65,8 +65,34 @@ def save_voxbento_credentials(event: Event, base_url: str, api_key: str) -> None
 def clear_voxbento_credentials(event: Event) -> None:
     for key in EVENT_SETTINGS_KEYS:
         event.settings.delete(key)
+        
     from ..models import VoxbentoOAuthGrant
-    VoxbentoOAuthGrant.objects.filter(event=event).delete()
+    try:
+        grant = VoxbentoOAuthGrant.objects.get(event=event)
+    except VoxbentoOAuthGrant.DoesNotExist:
+        grant = None
+
+    if grant:
+        if grant.webhook_subscription_id:
+            import logging
+            import requests
+            from .voxbento_oauth import get_valid_access_token, VoxbentoReauthorizationRequired, VoxbentoTemporarilyUnavailable
+            logger = logging.getLogger(__name__)
+            try:
+                base_url = get_voxbento_base_url(event)
+                if base_url:
+                    api_url = f"{base_url.rstrip('/')}/api/v1/webhooks"
+                    access_token = get_valid_access_token(grant.id)
+                    if access_token:
+                        headers = {"Authorization": f"Bearer {access_token}"}
+                        delete_url = f"{api_url}/{grant.webhook_subscription_id}"
+                        resp = requests.delete(delete_url, headers=headers, timeout=5.0)
+                        if resp.status_code not in (204, 404):
+                            resp.raise_for_status()
+            except (requests.RequestException, VoxbentoReauthorizationRequired, VoxbentoTemporarilyUnavailable) as e:
+                logger.error("Failed to delete VoxBento webhook subscription %s for event %s: %s", grant.webhook_subscription_id, event.id, str(e))
+
+        grant.delete()
 
 
 def voxbento_server_host(event: Event) -> str:

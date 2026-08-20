@@ -43,10 +43,14 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
         state = secrets.token_urlsafe(16)
         request.session["voxbento_oauth_state"] = state
         
+        import urllib.parse
+        scope_str = "events:read rooms:write booths:read booths:write sessions:manage webhooks:manage"
+        encoded_scope = urllib.parse.quote(scope_str)
+        
         auth_url = (
             f"{voxbento_base}/oauth/authorize?response_type=code"
             f"&client_id={client_id}&redirect_uri={redirect_uri}"
-            f"&scope=events:read rooms:write booths:read booths:write sessions:manage"
+            f"&scope={encoded_scope}"
             f"&code_challenge={challenge}&code_challenge_method=S256"
             f"&event=testevent2"
             f"&state={state}"
@@ -116,6 +120,9 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
                     "needs_reauth": False,
                 },
             )
+            from .tasks import sync_voxbento_connection
+            sync_voxbento_connection.delay(event.id)
+            
             messages.success(request, _("Successfully connected to VoxBento!"))
         except Exception as e:
             messages.error(request, _("Failed to exchange OAuth token: ") + str(e))
