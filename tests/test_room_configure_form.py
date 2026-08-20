@@ -11,6 +11,11 @@ class _FakeEvent:
     def __int__(self):
         return self.id
 
+    id = 1
+    pk = 1
+    id = 1
+    pk = 1
+
     def get_plugins(self):
         return ["interpretation"]
 
