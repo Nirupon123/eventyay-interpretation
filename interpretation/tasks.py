@@ -4,9 +4,8 @@ import redis
 import requests
 from celery import shared_task
 from celery.exceptions import MaxRetriesExceededError
-from django.core.cache import cache
-
 from eventyay.base.models import Event
+
 from .backends.voxbento_api import subscribe_to_voxbento_webhooks
 
 logger = logging.getLogger(__name__)

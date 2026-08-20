@@ -54,7 +54,7 @@ def call_voxbento_refresh(refresh_token, base_url):
     data = response.json()
     if "access_token" not in data or "refresh_token" not in data:
         raise VoxbentoTemporarilyUnavailable("VoxBento returned invalid token payload")
-        
+
     return data
 
 
@@ -70,7 +70,7 @@ def get_valid_access_token(grant_id):
         # Use django-redis cache lock
         with cache.lock(lock_key, timeout=10, blocking_timeout=8):
             grant.refresh_from_db()
-            
+
             # Re-check after acquiring lock
             if grant.expires_at and grant.expires_at > timezone.now() + timedelta(seconds=60):
                 return grant.access_token
@@ -81,16 +81,16 @@ def get_valid_access_token(grant_id):
 
             try:
                 new_tokens = call_voxbento_refresh(grant.refresh_token, base_url)
-                
+
                 grant.access_token = new_tokens["access_token"]
                 grant.refresh_token = new_tokens["refresh_token"]
                 expires_in = new_tokens.get("expires_in", 3600)
                 grant.expires_at = timezone.now() + timedelta(seconds=expires_in)
                 grant.needs_reauth = False
                 grant.save(update_fields=["access_token", "refresh_token", "expires_at", "needs_reauth"])
-                
+
                 return grant.access_token
-                
+
             except VoxbentoReauthorizationRequired:
                 grant.needs_reauth = True
                 grant.save(update_fields=["needs_reauth"])

@@ -1,5 +1,5 @@
-import hmac
 import hashlib
+import hmac
 import json
 import logging
 import time
@@ -44,7 +44,7 @@ class VoxbentoWebhookReceiverView(View):
         event_slug = payload.get("event_slug")
         if not event_slug:
             return JsonResponse({"detail": "Missing event_slug in payload"}, status=400)
-            
+
         try:
             grant = VoxbentoOAuthGrant.objects.get(event__slug=event_slug)
         except VoxbentoOAuthGrant.DoesNotExist:
@@ -55,11 +55,11 @@ class VoxbentoWebhookReceiverView(View):
 
         # Reconstruct the signed payload: {timestamp}.{raw_request_body}
         signed_payload = f"{timestamp}.{request.body.decode('utf-8')}"
-        
+
         secret = grant.webhook_secret_key.encode('utf-8')
         computed_signature = hmac.new(
-            secret, 
-            signed_payload.encode('utf-8'), 
+            secret,
+            signed_payload.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
 
@@ -68,5 +68,5 @@ class VoxbentoWebhookReceiverView(View):
 
         event_type = payload.get("event_type")
         logger.info("Received valid VoxBento webhook for event %s: %s", event_slug, event_type)
-        
+
         return HttpResponse("OK", status=200)

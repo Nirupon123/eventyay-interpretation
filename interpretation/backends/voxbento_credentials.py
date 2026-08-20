@@ -24,23 +24,23 @@ class VoxbentoError(Exception):
 
 def get_voxbento_base_url(event: Event) -> str:
     from eventyay.base.settings import GlobalSettingsObject
-    
+
     # Check Global Settings first
     gs = GlobalSettingsObject().settings
     global_url = gs.get("voxbento_base_url", "")
-    
+
     # Fallback to legacy event-level settings
     url = global_url or event.settings.get(
         SETTING_VOXBENTO_BASE_URL, default="", as_type=str
     ).strip()
-    
+
     if not url:
         return ""
-        
+
     parsed = urlparse(url)
     if parsed.scheme != "https" and parsed.hostname not in ("localhost", "127.0.0.1"):
         raise VoxbentoError("VoxBento Base URL must use HTTPS unless running locally.")
-        
+
     return url
 
 
@@ -65,7 +65,7 @@ def save_voxbento_credentials(event: Event, base_url: str, api_key: str) -> None
 def clear_voxbento_credentials(event: Event) -> None:
     for key in EVENT_SETTINGS_KEYS:
         event.settings.delete(key)
-        
+
     from ..models import VoxbentoOAuthGrant
     try:
         grant = VoxbentoOAuthGrant.objects.get(event=event)
@@ -75,8 +75,14 @@ def clear_voxbento_credentials(event: Event) -> None:
     if grant:
         if grant.webhook_subscription_id:
             import logging
+
             import requests
-            from .voxbento_oauth import get_valid_access_token, VoxbentoReauthorizationRequired, VoxbentoTemporarilyUnavailable
+
+            from .voxbento_oauth import (
+                VoxbentoReauthorizationRequired,
+                VoxbentoTemporarilyUnavailable,
+                get_valid_access_token,
+            )
             logger = logging.getLogger(__name__)
             try:
                 base_url = get_voxbento_base_url(event)
@@ -90,7 +96,12 @@ def clear_voxbento_credentials(event: Event) -> None:
                         if resp.status_code not in (204, 404):
                             resp.raise_for_status()
             except (requests.RequestException, VoxbentoReauthorizationRequired, VoxbentoTemporarilyUnavailable) as e:
-                logger.error("Failed to delete VoxBento webhook subscription %s for event %s: %s", grant.webhook_subscription_id, event.id, str(e))
+                logger.error(
+                    "Failed to delete VoxBento webhook subscription %s for event %s: %s",
+                    grant.webhook_subscription_id,
+                    event.id,
+                    str(e),
+                )
 
         grant.delete()
 

@@ -1,3 +1,7 @@
+import base64
+import hashlib
+import os
+
 import requests
 from django.contrib import messages
 from django.shortcuts import redirect
@@ -7,9 +11,7 @@ from django.views.generic import View
 from eventyay.control.permissions import EventPermissionRequiredMixin
 
 from .models import VoxbentoOAuthGrant
-import os
-import base64
-import hashlib
+
 
 def generate_pkce():
     """Generate a random code_verifier and its S256 code_challenge."""
@@ -35,18 +37,18 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
         if not voxbento_base:
             messages.error(request, _("Please configure the VoxBento Base URL in Interpreter settings first."))
             return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
-            
+
         verifier, challenge = generate_pkce()
         request.session["voxbento_oauth_code_verifier"] = verifier
 
         import secrets
         state = secrets.token_urlsafe(16)
         request.session["voxbento_oauth_state"] = state
-        
+
         import urllib.parse
         scope_str = "events:read rooms:write booths:read booths:write sessions:manage webhooks:manage"
         encoded_scope = urllib.parse.quote(scope_str)
-        
+
         auth_url = (
             f"{voxbento_base}/oauth/authorize?response_type=code"
             f"&client_id={client_id}&redirect_uri={redirect_uri}"
@@ -68,7 +70,7 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
             messages.error(request, _("OAuth authorization failed: No code provided."))
             kwargs = {"organizer": event.organizer.slug, "event": event.slug}
             return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
-            
+
         code_verifier = request.session.pop("voxbento_oauth_code_verifier", None)
         if not code_verifier:
             messages.error(request, _("OAuth authorization failed: Missing PKCE code verifier in session."))
@@ -76,7 +78,6 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
             return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
 
         from eventyay.base.settings import GlobalSettingsObject
-        from django.conf import settings
         client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
         client_secret = GlobalSettingsObject().settings.get("voxbento_client_secret", "")
         kwargs = {"organizer": event.organizer.slug, "event": event.slug}
@@ -104,9 +105,10 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
             )
             resp.raise_for_status()
             data = resp.json()
-            
-            from django.utils import timezone
+
             from datetime import timedelta
+
+            from django.utils import timezone
             expires_in = data.get("expires_in", 3600)
             expires_at = timezone.now() + timedelta(seconds=expires_in)
 
@@ -122,7 +124,7 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
             )
             from .tasks import sync_voxbento_connection
             sync_voxbento_connection.delay(event.id)
-            
+
             messages.success(request, _("Successfully connected to VoxBento!"))
         except Exception as e:
             messages.error(request, _("Failed to exchange OAuth token: ") + str(e))

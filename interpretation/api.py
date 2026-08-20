@@ -97,16 +97,16 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
             get_voxbento_api_key,
             get_voxbento_base_url,
         )
-        from .backends.voxbento_oauth import get_valid_access_token, VoxbentoReauthorizationRequired
+        from .backends.voxbento_oauth import VoxbentoReauthorizationRequired, get_valid_access_token
 
         base_url = get_voxbento_base_url(self.event)
-        
+
         grant = getattr(self.event, 'voxbento_oauth_grant', None)
         try:
             api_key = get_valid_access_token(grant.id) if grant else None
         except VoxbentoReauthorizationRequired:
             api_key = None
-            
+
         if not api_key:
             api_key = get_voxbento_api_key(self.event)
 

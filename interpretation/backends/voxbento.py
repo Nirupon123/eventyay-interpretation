@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from django.utils.translation import gettext_lazy as _
 
 from ..models import RoomInterpretation
@@ -13,10 +15,8 @@ from .voxbento_credentials import (
 )
 from .voxbento_oauth import (
     VoxbentoReauthorizationRequired,
-    VoxbentoTemporarilyUnavailable,
     get_valid_access_token,
 )
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +45,13 @@ class VoxbentoBackend(InterpreterBackend):
         base_url = get_voxbento_base_url(event)
         if not base_url:
             return
-            
+
         grant = getattr(event, 'voxbento_oauth_grant', None)
         try:
             access_token = get_valid_access_token(grant.id) if grant else None
         except VoxbentoReauthorizationRequired:
             access_token = None
-        
+
         if access_token:
             headers = {
                 "Authorization": f"Bearer {access_token}",

@@ -2,12 +2,12 @@ name: Code Style
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
     paths-ignore:
       - 'interpretation/locale/**'
       - 'interpretation/static/**'
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
     paths-ignore:
       - 'interpretation/locale/**'
       - 'interpretation/static/**'
@@ -21,7 +21,7 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v7
         with:
-          python-version: 3.11
+          python-version: "3.12"
       - uses: actions/cache@v6
         with:
           path: ~/.cache/pip
@@ -44,7 +44,7 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v7
         with:
-          python-version: 3.11
+          python-version: "3.12"
       - uses: actions/cache@v6
         with:
           path: ~/.cache/pip

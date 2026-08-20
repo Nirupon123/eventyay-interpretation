@@ -9,11 +9,12 @@ logger = logging.getLogger(__name__)
 
 def get_fernet():
     keys_str = os.environ.get("EVENTYAY_VOXBENTO_FERNET_KEYS", "")
-    
+
     if not keys_str:
-        from django.conf import settings
-        import hashlib
         import base64
+        import hashlib
+
+        from django.conf import settings
         # Derive a 32-byte url-safe base64 key from Django's SECRET_KEY
         secret = getattr(settings, "SECRET_KEY", "fallback-secret-key").encode('utf-8')
         derived_key = base64.urlsafe_b64encode(hashlib.sha256(secret).digest())

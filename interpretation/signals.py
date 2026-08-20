@@ -47,9 +47,11 @@ def navbar_entry_common(sender, request=None, **kwargs):
     ]
 
 from collections import OrderedDict
+
 from django import forms
 from eventyay.base.forms import SecretKeySettingsField
 from eventyay.base.signals import register_global_settings
+
 
 @receiver(register_global_settings, dispatch_uid="interpretation_global_settings")
 def register_voxbento_global_settings(sender, **kwargs):
