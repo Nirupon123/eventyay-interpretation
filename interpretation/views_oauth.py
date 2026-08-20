@@ -7,6 +7,15 @@ from django.views.generic import View
 from eventyay.control.permissions import EventPermissionRequiredMixin
 
 from .models import VoxbentoOAuthGrant
+import os
+import base64
+import hashlib
+
+def generate_pkce():
+    """Generate a random code_verifier and its S256 code_challenge."""
+    verifier = base64.urlsafe_b64encode(os.urandom(64)).decode('utf-8').rstrip('=')
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode('utf-8')).digest()).decode('utf-8').rstrip('=')
+    return verifier, challenge
 
 
 class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
@@ -27,10 +36,20 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
             messages.error(request, _("Please configure the VoxBento Base URL in Interpreter settings first."))
             return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
             
+        verifier, challenge = generate_pkce()
+        request.session["voxbento_oauth_code_verifier"] = verifier
+
+        import secrets
+        state = secrets.token_urlsafe(16)
+        request.session["voxbento_oauth_state"] = state
+        
         auth_url = (
             f"{voxbento_base}/oauth/authorize?response_type=code"
             f"&client_id={client_id}&redirect_uri={redirect_uri}"
             f"&scope=events:read rooms:write booths:read booths:write sessions:manage"
+            f"&code_challenge={challenge}&code_challenge_method=S256"
+            f"&event=testevent2"
+            f"&state={state}"
         )
         return redirect(auth_url)
 
@@ -45,10 +64,17 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
             messages.error(request, _("OAuth authorization failed: No code provided."))
             kwargs = {"organizer": event.organizer.slug, "event": event.slug}
             return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
+            
+        code_verifier = request.session.pop("voxbento_oauth_code_verifier", None)
+        if not code_verifier:
+            messages.error(request, _("OAuth authorization failed: Missing PKCE code verifier in session."))
+            kwargs = {"organizer": event.organizer.slug, "event": event.slug}
+            return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
 
         from eventyay.base.settings import GlobalSettingsObject
+        from django.conf import settings
         client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
-        client_secret = getattr(settings, "VOXBENTO_OAUTH_CLIENT_SECRET", "")
+        client_secret = GlobalSettingsObject().settings.get("voxbento_client_secret", "")
         kwargs = {"organizer": event.organizer.slug, "event": event.slug}
         redirect_uri = self.request.build_absolute_uri(
             reverse("plugins:interpretation:oauth_callback", kwargs=kwargs)
@@ -68,6 +94,7 @@ class VoxbentoOAuthCallbackView(EventPermissionRequiredMixin, View):
                     "client_secret": client_secret,
                     "code": code,
                     "redirect_uri": redirect_uri,
+                    "code_verifier": code_verifier,
                 },
                 timeout=5.0,
             )
