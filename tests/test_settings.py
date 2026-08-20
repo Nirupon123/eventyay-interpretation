@@ -12,6 +12,9 @@ from tests.conftest import SUSI_EVENT_CREDENTIALS, apply_susi_event_credentials
 
 
 class _FakeEvent:
+    id = 1
+    pk = 1
+
     def __init__(self, settings=None):
         self.settings = settings or {}
 

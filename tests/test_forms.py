@@ -40,6 +40,9 @@ class _FakeSettings:
 
 
 class _FakeEvent:
+    id = 1
+    pk = 1
+
     def __init__(self, settings=None):
         self.settings = _FakeSettings(settings)
 

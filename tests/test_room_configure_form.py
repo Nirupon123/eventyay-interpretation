@@ -5,6 +5,11 @@ from interpretation.models import RoomInterpretation
 
 
 class _FakeEvent:
+    id = 1
+    pk = 1
+    id = 1
+    pk = 1
+
     def get_plugins(self):
         return ["interpretation"]
 
