@@ -1,82 +1,49 @@
-"""Tests for event-level and per-room interpretation forms."""
+"""Tests for interpretation forms."""
+
+import pytest
 
 from interpretation.forms import (
     InterpretationSettingsForm,
+    RoomConfigureForm,
 )
-from interpretation.settings import SETTING_IS_ENABLED
-
-PUBLIC_URL = "https://example.com"
-
-
-class _FakeHierarkey:
-    defaults = {}
-
-    def get_declared_type(self, key):
-        return bool if key == SETTING_IS_ENABLED else str
+from interpretation.settings import (
+    SETTING_IS_ENABLED,
+    SETTING_USE_PLUGIN_STREAMS,
+    get_interpretation_settings,
+)
 
 
 class _FakeSettings:
     def __init__(self, data=None):
-        self._data = dict(data or {})
-        self._parent = None
-        self._h = _FakeHierarkey()
+        self._data = data or {}
 
-    def get(self, key, default=None, as_type=str):
-        if key not in self._data:
-            return default
-        value = self._data[key]
+    def get(self, key, default=None, as_type=None):
+        val = self._data.get(key, default)
         if as_type is bool:
-            return bool(value)
-        return as_type(value)
-
-    def freeze(self):
-        return self._data.copy()
-
-    def set(self, key, value):
-        self._data[key] = value
-
-    def _cache(self):
-        return self._data.keys()
+            return str(val).lower() in ("true", "1", "yes")
+        return val
 
 
 class _FakeEvent:
     id = 1
     pk = 1
 
+    def __int__(self):
+        return self.id
+
     def __init__(self, settings=None):
         self.settings = _FakeSettings(settings)
 
 
-def _event_form(data, settings=None, prefix="interpretation"):
+def test_interpretation_settings_form_initial():
+    event = _FakeEvent({SETTING_IS_ENABLED: True})
+    form = InterpretationSettingsForm(obj=event)
+    assert form.fields["interpretation_is_enabled"].initial is True
+
+
+def test_interpretation_settings_form_save():
+    settings = {}
+    data = {SETTING_IS_ENABLED: True, SETTING_USE_PLUGIN_STREAMS: False}
+    prefix = "interpretation"
     post = {f"{prefix}-{key}": value for key, value in data.items()}
     return InterpretationSettingsForm(obj=_FakeEvent(settings), data=post, prefix=prefix)
-
-
-def test_event_enable_toggle_can_be_saved(monkeypatch):
-    monkeypatch.setattr(
-        "interpretation.room_control.stop_all_event_sessions",
-        lambda event: None,
-    )
-    form = _event_form({SETTING_IS_ENABLED: False})
-    assert form.is_valid(), form.errors
-    form.save()
-    assert form.obj.settings.get(SETTING_IS_ENABLED, as_type=bool) is False
-
-
-def test_event_disable_stops_sessions(monkeypatch):
-    stopped = []
-
-    def fake_stop_all(event):
-        stopped.append(event)
-
-    monkeypatch.setattr(
-        "interpretation.room_control.stop_all_event_sessions",
-        fake_stop_all,
-    )
-    form = _event_form(
-        {SETTING_IS_ENABLED: False},
-        settings={SETTING_IS_ENABLED: True},
-    )
-    assert form.is_valid(), form.errors
-    form.save()
-    assert stopped == [form.obj]

@@ -7,8 +7,9 @@ from interpretation.models import RoomInterpretation
 class _FakeEvent:
     id = 1
     pk = 1
-    id = 1
-    pk = 1
+
+    def __int__(self):
+        return self.id
 
     def get_plugins(self):
         return ["interpretation"]
