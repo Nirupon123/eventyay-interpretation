@@ -1,0 +1,38 @@
+name: Update uv.lock for Dependabot
+on:
+  pull_request_target:
+    branches: [main, dev]
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  update-lock:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Update uv.lock
+        run: uv lock --upgrade
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add uv.lock
+          if git diff --staged --quiet; then
+            echo "No changes to uv.lock"
+          else
+            git commit -m "build(deps): update uv.lock"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
