@@ -1,9 +1,9 @@
-Interpretation
-==========================
+Eventyay Interpretation
+=======================
 
-This is a plugin for `eventyay`_. 
+This repository contains the `eventyay`_ plugin for integrating the `fossasia/voxbento`_ live interpretation console.
 
-A plugin for live interpretation of video streams
+It allows Eventyay organizers to seamlessly connect their events to a VoxBento instance, enabling live interpretation of video streams, language selection, and live captions.
 
 Development setup
 -----------------
@@ -49,4 +49,5 @@ Released under the terms of the Apache License 2.0
 
 
 .. _eventyay: https://github.com/fossasia/eventyay
+.. _fossasia/voxbento: https://github.com/fossasia/voxbento
 .. _eventyay development setup: https://github.com/fossasia/eventyay?tab=readme-ov-file#getting-started
