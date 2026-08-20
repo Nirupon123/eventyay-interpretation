@@ -1,15 +1,12 @@
 """Tests for interpretation forms."""
 
-import pytest
 
 from interpretation.forms import (
     InterpretationSettingsForm,
-    RoomConfigureForm,
 )
 from interpretation.settings import (
     SETTING_IS_ENABLED,
     SETTING_USE_PLUGIN_STREAMS,
-    get_interpretation_settings,
 )
 
 

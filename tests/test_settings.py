@@ -1,6 +1,5 @@
 """Tests for plugin settings."""
 
-import pytest
 
 from interpretation.settings import (
     SETTING_IS_ENABLED,
