@@ -52,7 +52,7 @@ EVY_RUNNING_ENVIRONMENT = "testing"
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-extend-exclude = ["migrations", ".ropeproject", "static", "_static", "build"]
+extend-exclude = ["migrations", ".ropeproject", "static", "_static", "build", ".agents"]
 
 [tool.ruff.lint]
 # Mirror the previous flake8 default checks (E/F/W) plus isort (I).
