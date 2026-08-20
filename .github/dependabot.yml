@@ -5,6 +5,7 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    target-branch: "dev"
       time: "04:00"
       timezone: "Asia/Singapore"
     open-pull-requests-limit: 10
@@ -19,6 +20,7 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    target-branch: "dev"
       time: "04:30"
       timezone: "Asia/Singapore"
     open-pull-requests-limit: 5
