@@ -4,11 +4,11 @@ import json
 import logging
 import time
 
-from eventyay.base.models import Room
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
+from eventyay.base.models import Room
 
 from .models import VoxbentoOAuthGrant
 
