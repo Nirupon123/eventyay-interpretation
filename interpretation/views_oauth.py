@@ -48,7 +48,7 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
 
         import urllib.parse
 
-        scope_str = "events:read rooms:write booths:read booths:write sessions:manage webhooks:manage"
+        scope_str = "events:read events:write rooms:write booths:read booths:write sessions:manage webhooks:manage"
         encoded_scope = urllib.parse.quote(scope_str)
 
         auth_url = (
