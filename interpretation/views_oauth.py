@@ -51,7 +51,7 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
         request.session[f"voxbento_oauth_state:{event.slug}"] = {
             "state": state,
             "code_verifier": verifier,
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
         scope_str = "events:read events:write rooms:write booths:read booths:write sessions:manage webhooks:manage"
@@ -72,7 +72,6 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
 
 
 class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
-
     def get(self, request, *args, **kwargs):
         state = request.GET.get("state", "")
         if "::" not in state:
@@ -137,6 +136,7 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             return redirect(dashboard_url)
 
         import requests
+
         try:
             resp = requests.post(
                 f"{voxbento_base}/oauth/token",
