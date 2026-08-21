@@ -4,7 +4,7 @@ import json
 import logging
 import time
 
-from base.models import Room
+from eventyay.base.models import Room
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
