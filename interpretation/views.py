@@ -182,6 +182,7 @@ class InterpretationInterpreters(
         if action == "delete_event":
             if backend.id == "voxbento":
                 from .backends.voxbento_api import delete_voxbento_event
+
                 try:
                     delete_voxbento_event(event)
                     clear_interpreter_credentials(event, backend.id)

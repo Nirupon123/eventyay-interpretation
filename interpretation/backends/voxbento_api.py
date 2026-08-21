@@ -146,7 +146,7 @@ def create_voxbento_event(event: Event) -> None:
     }
 
     resp = requests.post(api_url, headers=headers, json=payload, timeout=5.0)
-    
+
     if resp.status_code == 409:
         # Event already exists (idempotent success)
         logger.info("VoxBento event %s already exists.", event.slug)
@@ -190,10 +190,10 @@ def delete_voxbento_event(event: Event) -> None:
     }
 
     resp = requests.delete(api_url, headers=headers, timeout=5.0)
-    
+
     if resp.status_code == 404:
         return
-        
+
     if resp.status_code == 409:
         raise ValueError("Cannot delete event: Active sessions are running.")
 
@@ -211,17 +211,17 @@ def sync_voxbento_room(event: Event, room_id: int, payload: dict) -> None:
     base_url = get_voxbento_base_url(event)
     if not base_url:
         return
-        
+
     api_url = f"{base_url.rstrip('/')}/api/v1/events/{event.slug}/rooms/{room_id}"
     access_token = get_valid_access_token(grant.id)
     if not access_token:
         return
-        
+
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
-    
+
     resp = requests.put(api_url, headers=headers, json=payload, timeout=5.0)
     resp.raise_for_status()
 
@@ -233,18 +233,17 @@ def delete_voxbento_room(event: Event, room_id: int) -> None:
     grant = getattr(event, "voxbento_oauth_grant", None)
     if not grant:
         return
-        
+
     base_url = get_voxbento_base_url(event)
     if not base_url:
         return
-        
+
     api_url = f"{base_url.rstrip('/')}/api/v1/events/{event.slug}/rooms/{room_id}"
     access_token = get_valid_access_token(grant.id)
     if not access_token:
         return
-        
+
     headers = {"Authorization": f"Bearer {access_token}"}
     resp = requests.delete(api_url, headers=headers, timeout=5.0)
     if resp.status_code != 404:
         resp.raise_for_status()
-

@@ -34,7 +34,7 @@ def sync_voxbento_connection(self, event_id: int) -> None:
             create_voxbento_event(event)
         except requests.RequestException as e:
             if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code < 500:
-                raise # Don't retry 4xx errors for creation, it's failed.
+                raise  # Don't retry 4xx errors for creation, it's failed.
             self.retry(exc=e)
 
         # Reload grant to ensure we have latest flags
@@ -48,10 +48,10 @@ def sync_voxbento_connection(self, event_id: int) -> None:
             subscribe_to_voxbento_webhooks(event)
         except requests.RequestException as e:
             if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code < 500:
-                pass # Already handled inside subscribe_to_voxbento_webhooks
+                pass  # Already handled inside subscribe_to_voxbento_webhooks
             else:
                 self.retry(exc=e)
-                
+
         # Step 3: Bulk Sync Rooms (Independent of webhook success)
         sync_all_rooms_to_voxbento.delay(event_id)
 
@@ -77,7 +77,7 @@ def sync_all_rooms_to_voxbento(self, event_id: int) -> None:
         rooms = list(event.rooms.filter(deleted=False))
         for room in rooms:
             sync_single_room_to_voxbento.delay(room.id, event.id, "upsert")
-            
+
     except Exception as e:
         logger.error(f"Failed to bulk sync rooms for event {event_id}: {e}", exc_info=True)
 
@@ -98,7 +98,7 @@ def sync_single_room_to_voxbento(self, room_id: int, event_id: int, action: str)
         # Upsert
         interpretation = getattr(room, "interpretation", None)
         data = serialize_room_interpretation(room, event, interpretation)
-        
+
         # VoxBento payload expects specific fields, map them here:
         payload = {
             "name": str(room.name),
@@ -107,7 +107,7 @@ def sync_single_room_to_voxbento(self, room_id: int, event_id: int, action: str)
         if interpretation and getattr(interpretation, "enabled", False):
             payload["target_languages"] = interpretation.languages
         sync_voxbento_room(event, room_id, payload)
-        
+
     except (Event.DoesNotExist, Room.DoesNotExist):
         if action != "delete":
             logger.warning(f"Entity does not exist for upsert room {room_id}")
@@ -117,7 +117,7 @@ def sync_single_room_to_voxbento(self, room_id: int, event_id: int, action: str)
             self.retry(exc=e)
         except MaxRetriesExceededError:
             logger.error(f"Max retries exceeded syncing room {room_id}")
-            if 'event' in locals() and hasattr(event, 'voxbento_oauth_grant'):
+            if "event" in locals() and hasattr(event, "voxbento_oauth_grant"):
                 grant = event.voxbento_oauth_grant
                 grant.room_sync_failed = True
                 grant.save(update_fields=["room_sync_failed"])
