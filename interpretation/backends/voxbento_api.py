@@ -71,7 +71,7 @@ def subscribe_to_voxbento_webhooks(event: Event) -> None:
         target_url = get_webhook_target_url()
         payload = {
             "target_url": target_url,
-            "event_types": ["room.interpretation.started", "room.interpretation.stopped", "room.interpretation.failed"],
+            "event_types": ["booth.transcription.started", "booth.transcription.stopped", "booth.interpreter.joined"],
         }
 
         access_token = get_valid_access_token(grant.id)
