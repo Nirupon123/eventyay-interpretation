@@ -125,10 +125,13 @@ def room_interpretation_post_save(sender, instance, created, **kwargs):
         return
 
     from interpretation.backends.voxbento_oauth import VoxbentoReauthorizationRequired
+
     needs_retry = False
     try:
         needs_retry = _do_sync_single_room_to_voxbento(
-            instance.room.id, instance.room.event_id, "upsert",
+            instance.room.id,
+            instance.room.event_id,
+            "upsert",
             room_instance=instance.room,
             old_module_config=None,  # RoomInterpretation changes are additive; no removal guard needed
         )
@@ -160,10 +163,13 @@ def room_pre_save(sender, instance, **kwargs):
             old_module_config = None
 
     from interpretation.backends.voxbento_oauth import VoxbentoReauthorizationRequired
+
     needs_retry = False
     try:
         needs_retry = _do_sync_single_room_to_voxbento(
-            instance.id, instance.event_id, "upsert",
+            instance.id,
+            instance.event_id,
+            "upsert",
             room_instance=instance,
             old_module_config=old_module_config,
         )

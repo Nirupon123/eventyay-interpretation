@@ -292,4 +292,3 @@ def get_voxbento_room_langs(event: Event, room_id: int) -> set[str]:
         return {b["language_code"] for b in booths_data if b.get("language_code")}
     except Exception:
         return set()
-

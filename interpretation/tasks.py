@@ -85,6 +85,7 @@ def sync_all_rooms_to_voxbento(self, event_id: int) -> None:
 
 LANGUAGE_MAP_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "language_map.yml")
 
+
 def _load_language_map():
     try:
         with open(LANGUAGE_MAP_PATH, "r", encoding="utf-8") as f:
@@ -92,6 +93,7 @@ def _load_language_map():
     except Exception as e:
         logger.error(f"Failed to load language_map.yml: {e}")
         return {}
+
 
 LANGUAGE_NAME_TO_CODE = _load_language_map()
 
