@@ -11,7 +11,16 @@ jobs:
     if: github.repository_owner == 'fossasia'
     runs-on: ubuntu-latest
     steps:
+      - name: Warn if token is missing
+        if: env.TOKEN == ''
+        env:
+          TOKEN: ${{ secrets.EVENTYAY_DISPATCH_TOKEN }}
+        run: echo "::warning::EVENTYAY_DISPATCH_TOKEN is not set, skipping repository dispatch"
+
       - name: Dispatch plugin_updated event
+        if: env.TOKEN != ''
+        env:
+          TOKEN: ${{ secrets.EVENTYAY_DISPATCH_TOKEN }}
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.EVENTYAY_DISPATCH_TOKEN }}
