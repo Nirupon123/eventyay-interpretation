@@ -149,9 +149,9 @@ def _do_sync_single_room_to_voxbento(
         }
 
         from interpretation.backends.voxbento_api import get_voxbento_room_langs
-        from interpretation.settings import is_plugin_streams_enabled
+        from interpretation.settings import use_plugin_language_streams
 
-        use_plugin_streams = is_plugin_streams_enabled(event)
+        use_plugin_streams = use_plugin_language_streams(event)
         if use_plugin_streams:
             interpretation = getattr(room, "interpretation", None)
             if interpretation and interpretation.target_languages:
