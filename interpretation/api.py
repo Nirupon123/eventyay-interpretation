@@ -7,8 +7,10 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
+from .backends.registry import get_backend
 from .models import RoomInterpretation
 from .room_control import (
+    get_interpretation,
     plugin_enabled,
     serialize_room_interpretation,
     start_room_session,
@@ -61,6 +63,29 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         return Response(serialize_room_interpretation(room, self.event, interpretation))
+
+    @action(detail=False, methods=["post"], url_path="sync")
+    def sync(self, request, room_pk=None, **kwargs):
+        room = self._ensure_room()
+        interpretation = get_interpretation(room)
+        if not interpretation or interpretation.interpreter != RoomInterpretation.INTERPRETER_VOXBENTO:
+            return Response({"detail": "Room is not configured for VoxBento."}, status=400)
+
+        backend = get_backend(interpretation.interpreter)
+        from .backends.voxbento_oauth import VoxbentoTemporarilyUnavailable
+
+        try:
+            synced_count = backend.sync_booths(self.event, interpretation)
+            if synced_count == 0 and interpretation.target_languages:
+                return Response(
+                    {"detail": "Failed to sync any booths with Voxbento. Check credentials or network."},
+                    status=400,
+                )
+        except VoxbentoTemporarilyUnavailable:
+            return Response({"detail": "VoxBento is temporarily unavailable."}, status=503)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=500)
+        return Response({"status": "synced"})
 
     @action(detail=False, methods=["post"], url_path="start")
     def start(self, request, room_pk=None, **kwargs):
