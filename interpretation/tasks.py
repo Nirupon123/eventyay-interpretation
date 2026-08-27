@@ -200,16 +200,23 @@ def _do_sync_single_room_to_voxbento(
                     stream_dict = {entry["language"]: entry for entry in new_streams if "language" in entry}
                     needs_save = False
 
-                    for lang, full_url in returned_urls.items():
-                        if lang in stream_dict:
-                            existing = stream_dict[lang].get("youtube_id") or ""
+                    from .language_map import language_code_for_name, language_name_for_code
+
+                    # Create a reverse lookup for code -> Name
+                    code_to_name = {language_code_for_name(name): name for name in stream_dict.keys()}
+
+                    for lang_code, full_url in returned_urls.items():
+                        lang_name = code_to_name.get(lang_code)
+                        if lang_name and lang_name in stream_dict:
+                            existing = stream_dict[lang_name].get("youtube_id") or ""
                             if not existing or "/whep" in existing or "localhost" in existing:
                                 if existing != full_url:
-                                    stream_dict[lang]["youtube_id"] = full_url
+                                    stream_dict[lang_name]["youtube_id"] = full_url
                                     needs_save = True
                         else:
-                            # Language added but wasn't in streams
-                            stream_dict[lang] = {"language": lang, "youtube_id": full_url}
+                            # Language added but wasn't in streams (edge case)
+                            resolved_name = language_name_for_code(lang_code)
+                            stream_dict[resolved_name] = {"language": resolved_name, "youtube_id": full_url}
                             needs_save = True
 
                     if needs_save:
