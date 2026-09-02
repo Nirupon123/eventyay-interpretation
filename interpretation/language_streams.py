@@ -51,13 +51,15 @@ def is_whep_or_url_source(audio_source: str) -> bool:
     return normalize_youtube_video_id(normalized) is None
 
 
-def is_usable_stream_entry(entry: dict | None) -> bool:
+def is_usable_stream_entry(entry: dict | None, allow_blank: bool = False) -> bool:
     if not entry or not (entry.get("language") or "").strip():
         return False
     language = entry["language"].strip()
     if language == ORIGINAL_LANGUAGE:
         return True
     source = entry.get("youtube_id") or entry.get("audio_source") or ""
+    if allow_blank and not source:
+        return True
     return bool(normalize_audio_source(source))
 
 
@@ -104,7 +106,14 @@ def validate_language_streams(streams) -> list[dict]:
 
 def attendee_language_streams(stored_streams: list | None, event=None, room=None) -> list[dict]:
     """Dropdown payload for the video room, always including Original."""
-    streams = [entry for entry in (stored_streams or []) if is_usable_stream_entry(entry)]
+    allow_blank = False
+    if event and room:
+        from .backends.voxbento_credentials import get_voxbento_base_url
+
+        if get_voxbento_base_url(event) and getattr(event, "voxbento_oauth_grant", None):
+            allow_blank = True
+
+    streams = [entry for entry in (stored_streams or []) if is_usable_stream_entry(entry, allow_blank=allow_blank)]
     normalized = [normalize_stream_entry(entry) for entry in streams]
     if not any(entry["language"] == ORIGINAL_LANGUAGE for entry in normalized):
         normalized.insert(
