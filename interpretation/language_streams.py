@@ -102,7 +102,7 @@ def validate_language_streams(streams) -> list[dict]:
     return cleaned
 
 
-def attendee_language_streams(stored_streams: list | None) -> list[dict]:
+def attendee_language_streams(stored_streams: list | None, event=None, room=None) -> list[dict]:
     """Dropdown payload for the video room, always including Original."""
     streams = [entry for entry in (stored_streams or []) if is_usable_stream_entry(entry)]
     normalized = [normalize_stream_entry(entry) for entry in streams]
@@ -115,4 +115,32 @@ def attendee_language_streams(stored_streams: list | None) -> list[dict]:
                 "use_video": False,
             },
         )
+        
+    # Inject VoxBento WebSockets if event and room are provided
+    if event and room:
+        from .backends.voxbento_credentials import get_voxbento_base_url
+        from .language_map import language_code_for_name
+        
+        base_url = get_voxbento_base_url(event)
+        grant = getattr(event, "voxbento_oauth_grant", None)
+        
+        if base_url and grant:
+            ws_base = base_url.replace("https://", "wss://").replace("http://", "ws://").rstrip("/")
+            
+            # Use the VoxBento room ID if we have it saved, otherwise fallback to Eventyay's room ID
+            v_room_id = str(room.id)
+            if hasattr(room, "interpretation") and room.interpretation.backend_session_id:
+                v_room_id = room.interpretation.backend_session_id
+
+            for entry in normalized:
+                if entry["language"] == ORIGINAL_LANGUAGE:
+                    booth_id = f"{grant.event.slug}-{v_room_id}-floor"
+                    entry["caption_ws_url"] = f"{ws_base}/ws/captions/{booth_id}"
+                else:
+                    lang_code = language_code_for_name(entry["language"])
+                    if lang_code:
+                        entry["language_code"] = lang_code
+                        booth_id = f"{grant.event.slug}-{v_room_id}-{lang_code}"
+                        entry["caption_ws_url"] = f"{ws_base}/ws/captions/{booth_id}"
+
     return normalized

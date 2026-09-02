@@ -17,9 +17,11 @@ room_router.register(
     basename="room-interpretation",
 )
 
+
 _PREFIX = "common/event/<orgslug:organizer>/<slug:event>/interpretation/"
 
 urlpatterns = [
+
     path(
         _PREFIX,
         InterpretationOverview.as_view(),

@@ -47,6 +47,12 @@ def navbar_entry_common(sender, request=None, **kwargs):
     ]
 
 
+from django.utils.html import format_html
+from django.templatetags.static import static
+from eventyay.presale.signals import html_head
+
+
+
 from collections import OrderedDict
 
 from django import forms
