@@ -128,7 +128,11 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
             get_voxbento_api_key,
             get_voxbento_base_url,
         )
-        from .backends.voxbento_oauth import VoxbentoReauthorizationRequired, VoxbentoTemporarilyUnavailable, get_valid_access_token
+        from .backends.voxbento_oauth import (
+            VoxbentoReauthorizationRequired,
+            VoxbentoTemporarilyUnavailable,
+            get_valid_access_token,
+        )
 
         base_url = get_voxbento_base_url(self.event)
 
@@ -161,16 +165,24 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
 
         try:
             response = requests.post(url, headers=headers, timeout=5.0)
-            
+
             if response.status_code == 401 and is_oauth and grant:
                 # Force token refresh if unauthorized
-                from django.utils import timezone
                 from datetime import timedelta
+
+                from django.utils import timezone
+
                 grant.expires_at = timezone.now() - timedelta(days=1)
                 grant.save(update_fields=["expires_at"])
-                
+
                 # Fetch new token
-                api_key = get_valid_access_token(grant.id)
+                try:
+                    api_key = get_valid_access_token(grant.id)
+                except VoxbentoReauthorizationRequired:
+                    return Response({"detail": "VoxBento authorization expired."}, status=401)
+                except VoxbentoTemporarilyUnavailable:
+                    return Response({"detail": "VoxBento is temporarily unavailable."}, status=503)
+
                 headers["Authorization"] = f"Bearer {api_key}"
                 response = requests.post(url, headers=headers, timeout=5.0)
 
@@ -210,7 +222,11 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
         import requests
 
         from .backends.voxbento_credentials import get_voxbento_api_key, get_voxbento_base_url
-        from .backends.voxbento_oauth import VoxbentoReauthorizationRequired, VoxbentoTemporarilyUnavailable, get_valid_access_token
+        from .backends.voxbento_oauth import (
+            VoxbentoReauthorizationRequired,
+            VoxbentoTemporarilyUnavailable,
+            get_valid_access_token,
+        )
 
         base_url = get_voxbento_base_url(self.event)
         grant = getattr(self.event, "voxbento_oauth_grant", None)
@@ -238,8 +254,9 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
                 booths = data.get("booths", [])
                 # Filter to only booths for this room (room_id matches)
                 room_booths = [
-                    b for b in booths
-                    if b.get("room_id") == room.pk or b.get("eventyay_room_id") == str(room.pk)
+                    b
+                    for b in booths
+                    if str(b.get("room_id", "")) == str(room.pk) or str(b.get("eventyay_room_id", "")) == str(room.pk)
                 ]
                 return Response({"booths": room_booths})
             else:

@@ -115,18 +115,20 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
                 "use_video": False,
             },
         )
-        
+
     # Inject VoxBento WebSockets if event and room are provided
     if event and room:
         from .backends.voxbento_credentials import get_voxbento_base_url
         from .language_map import language_code_for_name
-        
+
         base_url = get_voxbento_base_url(event)
         grant = getattr(event, "voxbento_oauth_grant", None)
-        
+
         if base_url and grant:
-            ws_base = base_url.replace("https://", "wss://").replace("http://", "ws://").rstrip("/")
-            
+            scheme = "wss://" if base_url.startswith("https://") else "ws" + "://"
+            base_domain = base_url.replace("https://", "").replace("http://", "").rstrip("/")
+            ws_base = f"{scheme}{base_domain}"
+
             # Use the VoxBento room ID if we have it saved, otherwise fallback to Eventyay's room ID
             v_room_id = str(room.id)
             if hasattr(room, "interpretation") and room.interpretation.backend_session_id:
