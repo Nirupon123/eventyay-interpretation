@@ -189,10 +189,9 @@ def _do_sync_single_room_to_voxbento(
         if response_data and "booths" in response_data:
             returned_urls = {
                 b.get("language", b.get("language_code")): b.get(
-                    "whep_url", f"{get_voxbento_base_url(event).rstrip('/')}/{b['whip_path']}/whep"
+                    "whep_url", f"{get_voxbento_base_url(event).rstrip('/')}/{b.get('whip_path', '')}/whep"
                 )
                 for b in response_data["booths"]
-                if b.get("type") == "human"
             }
 
             if not room_instance:
