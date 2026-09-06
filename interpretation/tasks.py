@@ -187,12 +187,20 @@ def _do_sync_single_room_to_voxbento(
             grant.save(update_fields=["room_sync_failed"])
 
         if response_data and "booths" in response_data:
-            returned_urls = {
-                b.get("language", b.get("language_code")): b.get(
-                    "whep_url", f"{get_voxbento_base_url(event).rstrip('/')}/{b.get('whip_path', '')}/whep"
-                )
-                for b in response_data["booths"]
-            }
+            base_url = get_voxbento_base_url(event).rstrip('/')
+            returned_urls = {}
+            for b in response_data["booths"]:
+                if b.get("type") != "human":
+                    continue
+                whep_url = b.get("whep_url")
+                if not whep_url:
+                    whip_path = b.get("whip_path")
+                    if whip_path:
+                        whep_url = f"{base_url}/{whip_path}/whep"
+                if whep_url:
+                    lang_key = b.get("language") or b.get("language_code")
+                    if lang_key:
+                        returned_urls[lang_key] = whep_url
 
             if not room_instance:
                 room.refresh_from_db()

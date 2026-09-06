@@ -107,10 +107,18 @@ def validate_language_streams(streams) -> list[dict]:
 def attendee_language_streams(stored_streams: list | None, event=None, room=None) -> list[dict]:
     """Dropdown payload for the video room, always including Original."""
     allow_blank = False
+    base_url = None
+    grant = None
     if event and room:
-        from .backends.voxbento_credentials import get_voxbento_base_url
+        from .backends.voxbento_credentials import VoxbentoError, get_voxbento_base_url
 
-        if get_voxbento_base_url(event) and getattr(event, "voxbento_oauth_grant", None):
+        try:
+            base_url = get_voxbento_base_url(event)
+        except VoxbentoError:
+            base_url = None
+
+        grant = getattr(event, "voxbento_oauth_grant", None)
+        if base_url and grant:
             allow_blank = True
 
     streams = [entry for entry in (stored_streams or []) if is_usable_stream_entry(entry, allow_blank=allow_blank)]
@@ -127,11 +135,7 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
 
     # Inject VoxBento WebSockets if event and room are provided
     if event and room:
-        from .backends.voxbento_credentials import get_voxbento_base_url
         from .language_map import language_code_for_name
-
-        base_url = get_voxbento_base_url(event)
-        grant = getattr(event, "voxbento_oauth_grant", None)
 
         if base_url and grant:
             scheme = "wss://" if base_url.startswith("https://") else "ws" + "://"
