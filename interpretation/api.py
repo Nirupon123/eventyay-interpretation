@@ -164,7 +164,8 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
         }
 
         try:
-            response = requests.post(url, headers=headers, timeout=5.0)
+            payload = {"event_slug": self.event.slug}
+            response = requests.post(url, headers=headers, json=payload, timeout=5.0)
 
             if response.status_code == 401 and is_oauth and grant:
                 # Force token refresh if unauthorized
