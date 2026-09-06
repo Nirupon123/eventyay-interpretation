@@ -187,7 +187,7 @@ def _do_sync_single_room_to_voxbento(
             grant.save(update_fields=["room_sync_failed"])
 
         if response_data and "booths" in response_data:
-            base_url = get_voxbento_base_url(event).rstrip('/')
+            base_url = get_voxbento_base_url(event).rstrip("/")
             returned_urls = {}
             for b in response_data["booths"]:
                 if b.get("type") != "human":
