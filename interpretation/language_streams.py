@@ -138,9 +138,9 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
         from .language_map import language_code_for_name
 
         if base_url and grant:
-            scheme = "wss://" if base_url.startswith("https://") else "ws" + "://"
-            base_domain = base_url.replace("https://", "").replace("http://", "").rstrip("/")
-            ws_base = f"{scheme}{base_domain}"
+            parsed = urlparse(base_url)
+            scheme = "wss" if parsed.scheme == "https" else "ws"
+            ws_base = f"{scheme}://{parsed.netloc}{parsed.path.rstrip('/')}"
 
             # Use the VoxBento room ID if we have it saved, otherwise fallback to Eventyay's room ID
             v_room_id = str(room.id)
@@ -149,13 +149,13 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
 
             for entry in normalized:
                 if entry["language"] == ORIGINAL_LANGUAGE:
-                    booth_id = f"{grant.event.slug}-{v_room_id}-floor"
+                    booth_id = f"{event.slug}-{v_room_id}-floor"
                     entry["caption_ws_url"] = f"{ws_base}/ws/captions/{booth_id}"
                 else:
                     lang_code = language_code_for_name(entry["language"])
                     if lang_code:
                         entry["language_code"] = lang_code
-                        booth_id = f"{grant.event.slug}-{v_room_id}-{lang_code}"
+                        booth_id = f"{event.slug}-{v_room_id}-{lang_code}"
                         entry["caption_ws_url"] = f"{ws_base}/ws/captions/{booth_id}"
 
     return normalized

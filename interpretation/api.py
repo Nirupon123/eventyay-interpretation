@@ -1,5 +1,4 @@
 from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
 from eventyay.api.auth.permission import EventPermission
 from eventyay.api.mixins import PretalxViewSetMixin
 from eventyay.base.models.room import Room
@@ -37,6 +36,19 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
         if self.action in ("listener_token", "booth_status"):
             return []
         return super().get_permissions()
+
+    def get_throttles(self):
+        if self.action in ("listener_token", "booth_status"):
+            from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+
+            class AttendeeAnonThrottle(AnonRateThrottle):
+                rate = "30/minute"
+
+            class AttendeeUserThrottle(UserRateThrottle):
+                rate = "30/minute"
+
+            return [AttendeeAnonThrottle(), AttendeeUserThrottle()]
+        return super().get_throttles()
 
     def _get_room(self):
         if hasattr(self, "_room_cache"):
@@ -117,7 +129,6 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
             payload["warning"] = result.warning
         return Response(payload)
 
-    @csrf_exempt
     @action(detail=False, methods=["post"], url_path="listener-token")
     def listener_token(self, request, room_pk=None, **kwargs):
         self._ensure_room()
@@ -185,7 +196,7 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
                     return Response({"detail": "VoxBento is temporarily unavailable."}, status=503)
 
                 headers["Authorization"] = f"Bearer {api_key}"
-                response = requests.post(url, headers=headers, timeout=5.0)
+                response = requests.post(url, headers=headers, json=payload, timeout=5.0)
 
             if response.ok:
                 data = response.json()
