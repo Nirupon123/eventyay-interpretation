@@ -5,7 +5,9 @@ from eventyay.base.models.room import Room
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from .backends.registry import get_backend
 from .models import RoomInterpretation
@@ -18,6 +20,39 @@ from .room_control import (
     update_room_interpretation,
 )
 from .settings import use_plugin_language_streams
+
+
+class AttendeeAnonThrottle(AnonRateThrottle):
+    rate = "30/minute"
+    scope = "attendee_anon"
+
+
+class AttendeeUserThrottle(UserRateThrottle):
+    rate = "30/minute"
+    scope = "attendee_user"
+
+
+class AttendeeVideoPermission(BasePermission):
+    """Require proof of attendee video access or organizer permissions."""
+
+    def has_permission(self, request, view):
+        event = getattr(view, "event", None)
+        if not event:
+            return False
+
+        traits = getattr(request, "auth", {}).get("traits", []) if request.auth else []
+
+        try:
+            from eventyay.eventyay_common.video.permissions import video_attendee_trait
+
+            if "attendee" in traits or video_attendee_trait(event.slug) in traits:
+                return True
+        except ImportError:
+            if "attendee" in traits:
+                return True
+
+        return EventPermission().has_permission(request, view)
+
 
 PLUGIN_MODULE = "interpretation"
 
@@ -32,21 +67,13 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
     endpoint = "room_interpretation"
 
     def get_permissions(self):
-        # listener_token and booth_status are attendee-facing - no organizer auth needed
+        # listener_token and booth_status are attendee-facing
         if self.action in ("listener_token", "booth_status"):
-            return []
+            return [AttendeeVideoPermission()]
         return super().get_permissions()
 
     def get_throttles(self):
         if self.action in ("listener_token", "booth_status"):
-            from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
-
-            class AttendeeAnonThrottle(AnonRateThrottle):
-                rate = "30/minute"
-
-            class AttendeeUserThrottle(UserRateThrottle):
-                rate = "30/minute"
-
             return [AttendeeAnonThrottle(), AttendeeUserThrottle()]
         return super().get_throttles()
 
@@ -129,16 +156,10 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
             payload["warning"] = result.warning
         return Response(payload)
 
-    @action(detail=False, methods=["post"], url_path="listener-token")
-    def listener_token(self, request, room_pk=None, **kwargs):
-        self._ensure_room()
-
+    def _make_voxbento_request(self, method, oauth_path, legacy_path=None, **kwargs):
         import requests
 
-        from .backends.voxbento_credentials import (
-            get_voxbento_api_key,
-            get_voxbento_base_url,
-        )
+        from .backends.voxbento_credentials import get_voxbento_api_key, get_voxbento_base_url
         from .backends.voxbento_oauth import (
             VoxbentoReauthorizationRequired,
             VoxbentoTemporarilyUnavailable,
@@ -146,40 +167,40 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
         )
 
         base_url = get_voxbento_base_url(self.event)
-
         grant = getattr(self.event, "voxbento_oauth_grant", None)
-        try:
-            api_key = get_valid_access_token(grant.id) if grant else None
-        except VoxbentoReauthorizationRequired:
-            api_key = None
-        except VoxbentoTemporarilyUnavailable:
-            return Response({"detail": "VoxBento is temporarily unavailable."}, status=503)
 
+        def get_token():
+            try:
+                return get_valid_access_token(grant.id) if grant else None
+            except VoxbentoReauthorizationRequired:
+                return None
+
+        try:
+            api_key = get_token()
+        except VoxbentoTemporarilyUnavailable:
+            return None, False, {"detail": "VoxBento is temporarily unavailable.", "status": 503}
+
+        is_oauth = bool(api_key)
         if not api_key:
             api_key = get_voxbento_api_key(self.event)
-            is_oauth = False
-        else:
-            is_oauth = True
 
         if not base_url or not api_key:
-            return Response({"detail": "VoxBento is not configured for this event."}, status=400)
+            return None, False, {"detail": "VoxBento is not configured for this event.", "status": 400}
 
-        if is_oauth:
-            url = f"{base_url.rstrip('/')}/api/v1/events/{self.event.slug}/rooms/{room_pk}/listener-token"
+        path = oauth_path if is_oauth else (legacy_path or oauth_path)
+        url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+
+        headers = kwargs.pop("headers", {})
+        headers["Authorization"] = f"Bearer {api_key}"
+        if method in ("POST", "PUT", "PATCH"):
+            headers.setdefault("Content-Type", "application/json")
         else:
-            url = f"{base_url.rstrip('/')}/api/v1/tokens/listener"
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
+            headers.setdefault("Accept", "application/json")
 
         try:
-            payload = {"event_slug": self.event.slug}
-            response = requests.post(url, headers=headers, json=payload, timeout=5.0)
+            response = requests.request(method, url, headers=headers, timeout=5.0, **kwargs)
 
             if response.status_code == 401 and is_oauth and grant:
-                # Force token refresh if unauthorized
                 from datetime import timedelta
 
                 from django.utils import timezone
@@ -187,25 +208,40 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
                 grant.expires_at = timezone.now() - timedelta(days=1)
                 grant.save(update_fields=["expires_at"])
 
-                # Fetch new token
                 try:
-                    api_key = get_valid_access_token(grant.id)
-                except VoxbentoReauthorizationRequired:
-                    return Response({"detail": "VoxBento authorization expired."}, status=401)
+                    new_api_key = get_token()
                 except VoxbentoTemporarilyUnavailable:
-                    return Response({"detail": "VoxBento is temporarily unavailable."}, status=503)
+                    return None, False, {"detail": "VoxBento is temporarily unavailable.", "status": 503}
+                if not new_api_key:
+                    return None, False, {"detail": "VoxBento authorization expired.", "status": 401}
+                headers["Authorization"] = f"Bearer {new_api_key}"
+                response = requests.request(method, url, headers=headers, timeout=5.0, **kwargs)
 
-                headers["Authorization"] = f"Bearer {api_key}"
-                response = requests.post(url, headers=headers, json=payload, timeout=5.0)
-
-            if response.ok:
-                data = response.json()
-                token = data.get("listener_token") if is_oauth else data.get("token")
-                return Response({"token": token})
-            else:
-                return Response({"detail": f"VoxBento API Error: {response.text}"}, status=400)
+            return response, is_oauth, None
         except requests.RequestException as e:
-            return Response({"detail": f"Connection failed: {e}"}, status=400)
+            return None, False, {"detail": f"Connection failed: {e}", "status": 400}
+
+    @action(detail=False, methods=["post"], url_path="listener-token")
+    def listener_token(self, request, room_pk=None, **kwargs):
+        self._ensure_room()
+
+        oauth_path = f"api/v1/events/{self.event.slug}/rooms/{room_pk}/listener-token"
+        legacy_path = "api/v1/tokens/listener"
+
+        payload = {"event_slug": self.event.slug}
+        response, is_oauth, error = self._make_voxbento_request(
+            "POST", oauth_path, legacy_path=legacy_path, json=payload
+        )
+
+        if error:
+            return Response({"detail": error["detail"]}, status=error["status"])
+
+        if response.ok:
+            data = response.json()
+            token = data.get("listener_token") if is_oauth else data.get("token")
+            return Response({"token": token})
+        else:
+            return Response({"detail": f"VoxBento API Error: {response.text}"}, status=400)
 
     @action(detail=False, methods=["get"], url_path="streams")
     def streams(self, request, room_pk=None, **kwargs):
@@ -231,47 +267,18 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
         if room is None:
             return Response({"booths": []}, status=200)
 
-        import requests
+        path = f"api/events/{self.event.slug}/booths"
+        response, is_oauth, error = self._make_voxbento_request("GET", path)
 
-        from .backends.voxbento_credentials import get_voxbento_api_key, get_voxbento_base_url
-        from .backends.voxbento_oauth import (
-            VoxbentoReauthorizationRequired,
-            VoxbentoTemporarilyUnavailable,
-            get_valid_access_token,
-        )
-
-        base_url = get_voxbento_base_url(self.event)
-        grant = getattr(self.event, "voxbento_oauth_grant", None)
-        try:
-            api_key = get_valid_access_token(grant.id) if grant else None
-        except VoxbentoReauthorizationRequired:
-            api_key = None
-        except VoxbentoTemporarilyUnavailable:
-            return Response({"booths": []}, status=200)
-        if not api_key:
-            api_key = get_voxbento_api_key(self.event)
-
-        if not base_url or not api_key:
-            # VoxBento not configured — return empty booth list gracefully
+        if error or not response.ok:
             return Response({"booths": []}, status=200)
 
-        event_slug = self.event.slug
-        url = f"{base_url.rstrip('/')}/api/events/{event_slug}/booths"
-        headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
-
-        try:
-            response = requests.get(url, headers=headers, timeout=5.0)
-            if response.ok:
-                data = response.json()
-                booths = data.get("booths", [])
-                # Filter to only booths for this room (room_id matches)
-                room_booths = [
-                    b
-                    for b in booths
-                    if str(b.get("room_id", "")) == str(room.pk) or str(b.get("eventyay_room_id", "")) == str(room.pk)
-                ]
-                return Response({"booths": room_booths})
-            else:
-                return Response({"booths": []}, status=200)
-        except requests.RequestException:
-            return Response({"booths": []}, status=200)
+        data = response.json()
+        booths = data.get("booths", [])
+        # Filter to only booths for this room (room_id matches)
+        room_booths = [
+            b
+            for b in booths
+            if str(b.get("room_id", "")) == str(room.pk) or str(b.get("eventyay_room_id", "")) == str(room.pk)
+        ]
+        return Response({"booths": room_booths})
