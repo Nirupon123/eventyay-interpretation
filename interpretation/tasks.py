@@ -14,6 +14,7 @@ from .backends.voxbento_api import (
 )
 from .backends.voxbento_credentials import get_voxbento_base_url
 from .language_map import language_code_for_name
+from .models import RoomInterpretation
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +156,11 @@ def _do_sync_single_room_to_voxbento(
         response_data = sync_voxbento_room(event, room_id, payload)
 
         voxbento_room_id = response_data.get("room_id")
-        if voxbento_room_id and interpretation:
+        if (
+            voxbento_room_id
+            and interpretation
+            and interpretation.interpreter == RoomInterpretation.INTERPRETER_VOXBENTO
+        ):
             # Use update() to avoid triggering post_save signals which cause RecursionError
             type(interpretation).objects.filter(pk=interpretation.pk).update(backend_session_id=str(voxbento_room_id))
 
