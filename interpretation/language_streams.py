@@ -51,13 +51,15 @@ def is_whep_or_url_source(audio_source: str) -> bool:
     return normalize_youtube_video_id(normalized) is None
 
 
-def is_usable_stream_entry(entry: dict | None) -> bool:
+def is_usable_stream_entry(entry: dict | None, allow_blank: bool = False) -> bool:
     if not entry or not (entry.get("language") or "").strip():
         return False
     language = entry["language"].strip()
     if language == ORIGINAL_LANGUAGE:
         return True
     source = entry.get("youtube_id") or entry.get("audio_source") or ""
+    if allow_blank and not source:
+        return True
     return bool(normalize_audio_source(source))
 
 
@@ -102,9 +104,24 @@ def validate_language_streams(streams) -> list[dict]:
     return cleaned
 
 
-def attendee_language_streams(stored_streams: list | None) -> list[dict]:
+def attendee_language_streams(stored_streams: list | None, event=None, room=None) -> list[dict]:
     """Dropdown payload for the video room, always including Original."""
-    streams = [entry for entry in (stored_streams or []) if is_usable_stream_entry(entry)]
+    allow_blank = False
+    base_url = None
+    grant = None
+    if event and room:
+        from .backends.voxbento_credentials import VoxbentoError, get_voxbento_base_url
+
+        try:
+            base_url = get_voxbento_base_url(event)
+        except VoxbentoError:
+            base_url = None
+
+        grant = getattr(event, "voxbento_oauth_grant", None)
+        if base_url and grant:
+            allow_blank = True
+
+    streams = [entry for entry in (stored_streams or []) if is_usable_stream_entry(entry, allow_blank=allow_blank)]
     normalized = [normalize_stream_entry(entry) for entry in streams]
     if not any(entry["language"] == ORIGINAL_LANGUAGE for entry in normalized):
         normalized.insert(
@@ -115,4 +132,30 @@ def attendee_language_streams(stored_streams: list | None) -> list[dict]:
                 "use_video": False,
             },
         )
+
+    # Inject VoxBento WebSockets if event and room are provided
+    if event and room:
+        from .language_map import language_code_for_name
+
+        if base_url and grant:
+            parsed = urlparse(base_url)
+            scheme = "wss" if parsed.scheme == "https" else "ws"
+            ws_base = f"{scheme}://{parsed.netloc}{parsed.path.rstrip('/')}"
+
+            # Use the VoxBento room ID if we have it saved, otherwise fallback to Eventyay's room ID
+            v_room_id = str(room.id)
+            if hasattr(room, "interpretation") and room.interpretation.backend_session_id:
+                v_room_id = room.interpretation.backend_session_id
+
+            for entry in normalized:
+                if entry["language"] == ORIGINAL_LANGUAGE:
+                    booth_id = f"{event.slug}-{v_room_id}-floor"
+                    entry["caption_ws_url"] = f"{ws_base}/ws/captions/{booth_id}"
+                else:
+                    lang_code = language_code_for_name(entry["language"])
+                    if lang_code:
+                        entry["language_code"] = lang_code
+                        booth_id = f"{event.slug}-{v_room_id}-{lang_code}"
+                        entry["caption_ws_url"] = f"{ws_base}/ws/captions/{booth_id}"
+
     return normalized

@@ -14,6 +14,7 @@ from .backends.voxbento_api import (
 )
 from .backends.voxbento_credentials import get_voxbento_base_url
 from .language_map import language_code_for_name
+from .models import RoomInterpretation
 
 logger = logging.getLogger(__name__)
 
@@ -135,8 +136,8 @@ def _do_sync_single_room_to_voxbento(
         from interpretation.settings import use_plugin_language_streams
 
         use_plugin_streams = use_plugin_language_streams(event)
+        interpretation = getattr(room, "interpretation", None)
         if use_plugin_streams:
-            interpretation = getattr(room, "interpretation", None)
             if (
                 interpretation
                 and interpretation.room_enabled
@@ -153,6 +154,15 @@ def _do_sync_single_room_to_voxbento(
         payload["target_languages"] = list(new_lang_set)
 
         response_data = sync_voxbento_room(event, room_id, payload)
+
+        voxbento_room_id = response_data.get("room_id")
+        if (
+            voxbento_room_id
+            and interpretation
+            and interpretation.interpreter == RoomInterpretation.INTERPRETER_VOXBENTO
+        ):
+            # Use update() to avoid triggering post_save signals which cause RecursionError
+            type(interpretation).objects.filter(pk=interpretation.pk).update(backend_session_id=str(voxbento_room_id))
 
         if response_data.get("error") == 409:
             # We got a 409, meaning an active session was found.
@@ -182,10 +192,20 @@ def _do_sync_single_room_to_voxbento(
             grant.save(update_fields=["room_sync_failed"])
 
         if response_data and "booths" in response_data:
-            returned_urls = {
-                b["language"]: b.get("whep_url", f"{get_voxbento_base_url(event).rstrip('/')}/{b['whip_path']}/whep")
-                for b in response_data["booths"]
-            }
+            base_url = get_voxbento_base_url(event).rstrip("/")
+            returned_urls = {}
+            for b in response_data["booths"]:
+                if b.get("type") != "human":
+                    continue
+                whep_url = b.get("whep_url")
+                if not whep_url:
+                    whip_path = b.get("whip_path")
+                    if whip_path:
+                        whep_url = f"{base_url}/{whip_path}/whep"
+                if whep_url:
+                    lang_key = b.get("language") or b.get("language_code")
+                    if lang_key:
+                        returned_urls[lang_key] = whep_url
 
             if not room_instance:
                 room.refresh_from_db()
