@@ -159,8 +159,9 @@ def create_voxbento_event(event: Event) -> None:
         resp.raise_for_status()
     except requests.RequestException as e:
         logger.error("Failed to provision VoxBento event %s: %s", event.id, e)
-        grant.event_provisioning_failed = True
-        grant.save(update_fields=["event_provisioning_failed"])
+        if resp.status_code < 500:
+            grant.event_provisioning_failed = True
+            grant.save(update_fields=["event_provisioning_failed"])
         raise
 
     grant.event_provisioned = True
