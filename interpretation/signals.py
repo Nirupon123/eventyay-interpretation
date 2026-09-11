@@ -168,6 +168,12 @@ def room_pre_save(sender, instance, **kwargs):
 
     from interpretation.backends.voxbento_oauth import VoxbentoReauthorizationRequired
 
+    if not instance.pk:
+        # New room: wait for save to complete so we have a valid ID.
+        # The lambda captures `instance`, so `instance.id` will be populated when on_commit runs.
+        transaction.on_commit(lambda: sync_single_room_to_voxbento.delay(instance.id, instance.event_id, "upsert"))
+        return
+
     needs_retry = False
     try:
         needs_retry = _do_sync_single_room_to_voxbento(

@@ -227,6 +227,16 @@ def sync_voxbento_room(event: Event, room_id: int, payload: dict) -> dict:
 
     resp = requests.put(api_url, headers=headers, json=payload, timeout=5.0)
 
+    if resp.status_code == 404:
+        logger.warning(
+            "VoxBento returned 404 Not Found for room sync on event %s. "
+            "It may have been deleted. Attempting re-provision.",
+            event.id,
+        )
+        create_voxbento_event(event)
+        # Retry the request
+        resp = requests.put(api_url, headers=headers, json=payload, timeout=5.0)
+
     if resp.status_code == 409:
         logger.error("VoxBento returned 409 Conflict for room sync on event %s room %s", event.id, room_id)
         try:
