@@ -163,7 +163,8 @@ class RoomConfigureForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         interpreter = cleaned_data.get("interpreter")
-        if interpreter == "voxbento":
+        room_enabled = cleaned_data.get("room_enabled", False)
+        if interpreter == "voxbento" and room_enabled:
             from .backends.voxbento_credentials import get_voxbento_base_url
 
             try:

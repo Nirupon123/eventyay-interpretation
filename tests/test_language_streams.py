@@ -44,12 +44,13 @@ def test_attendee_language_streams_includes_original():
     assert is_usable_stream_entry(streams[1]) is True
 
 
-def test_augment_room_config_when_flag_enabled(event, room, mocker):
-    mocker.patch("interpretation.signals._do_sync_single_room_to_voxbento")
+def test_augment_room_config_when_flag_enabled(event, room, monkeypatch):
+    monkeypatch.setattr("interpretation.signals._do_sync_single_room_to_voxbento", lambda *args, **kwargs: False)
     event.plugins = "interpretation"
     event.save(update_fields=["plugins"])
     event.settings.set(SETTING_USE_PLUGIN_STREAMS, True)
     from interpretation.models import VoxbentoOAuthGrant
+
     event.settings.set("interpretation_voxbento_base_url", "https://v.example")
     VoxbentoOAuthGrant.objects.get_or_create(event=event, defaults={"access_token": "t", "is_disconnected": False})
     RoomInterpretation.objects.create(
@@ -67,11 +68,12 @@ def test_augment_room_config_when_flag_enabled(event, room, mocker):
     assert any(entry["language"] == "French" for entry in streams)
 
 
-def test_augment_room_config_when_flag_disabled(event, room, mocker):
-    mocker.patch("interpretation.signals._do_sync_single_room_to_voxbento")
+def test_augment_room_config_when_flag_disabled(event, room, monkeypatch):
+    monkeypatch.setattr("interpretation.signals._do_sync_single_room_to_voxbento", lambda *args, **kwargs: False)
     event.plugins = "interpretation"
     event.save(update_fields=["plugins"])
     from interpretation.models import VoxbentoOAuthGrant
+
     event.settings.set("interpretation_voxbento_base_url", "https://v.example")
     VoxbentoOAuthGrant.objects.get_or_create(event=event, defaults={"access_token": "t", "is_disconnected": False})
     RoomInterpretation.objects.create(
@@ -88,14 +90,15 @@ def test_augment_room_config_when_flag_disabled(event, room, mocker):
     assert "interpretation_language_streams" not in config
 
 
-def test_serialize_room_config_includes_plugin_flag(event, room, mocker):
-    mocker.patch("interpretation.signals._do_sync_single_room_to_voxbento")
+def test_serialize_room_config_includes_plugin_flag(event, room, monkeypatch):
+    monkeypatch.setattr("interpretation.signals._do_sync_single_room_to_voxbento", lambda *args, **kwargs: False)
     from eventyay.features.live.modules.room import serialize_room_config
 
     event.plugins = "interpretation"
     event.save(update_fields=["plugins"])
     event.settings.set(SETTING_USE_PLUGIN_STREAMS, True)
     from interpretation.models import VoxbentoOAuthGrant
+
     event.settings.set("interpretation_voxbento_base_url", "https://v.example")
     VoxbentoOAuthGrant.objects.get_or_create(event=event, defaults={"access_token": "t", "is_disconnected": False})
     RoomInterpretation.objects.create(
@@ -110,14 +113,15 @@ def test_serialize_room_config_includes_plugin_flag(event, room, mocker):
     assert payload["interpretation_use_plugin_streams"] is True
 
 
-def test_get_room_config_includes_plugin_streams(event, room, mocker):
-    mocker.patch("interpretation.signals._do_sync_single_room_to_voxbento")
+def test_get_room_config_includes_plugin_streams(event, room, monkeypatch):
+    monkeypatch.setattr("interpretation.signals._do_sync_single_room_to_voxbento", lambda *args, **kwargs: False)
     from eventyay.base.services.event import get_room_config
 
     event.plugins = "interpretation"
     event.save(update_fields=["plugins"])
     event.settings.set(SETTING_USE_PLUGIN_STREAMS, True)
     from interpretation.models import VoxbentoOAuthGrant
+
     event.settings.set("interpretation_voxbento_base_url", "https://v.example")
     VoxbentoOAuthGrant.objects.get_or_create(event=event, defaults={"access_token": "t", "is_disconnected": False})
     RoomInterpretation.objects.create(
@@ -133,8 +137,8 @@ def test_get_room_config_includes_plugin_streams(event, room, mocker):
     assert any(entry["language"] == "German" for entry in config["interpretation_language_streams"])
 
 
-def test_api_streams_endpoint(organizer_client, event, room, mocker):
-    mocker.patch("interpretation.signals._do_sync_single_room_to_voxbento")
+def test_api_streams_endpoint(organizer_client, event, room, monkeypatch):
+    monkeypatch.setattr("interpretation.signals._do_sync_single_room_to_voxbento", lambda *args, **kwargs: False)
     event.settings.set(SETTING_USE_PLUGIN_STREAMS, True)
     RoomInterpretation.objects.create(
         interpreter="voxbento",
@@ -155,12 +159,13 @@ def test_api_streams_endpoint(organizer_client, event, room, mocker):
     assert any(entry["language"] == "Original" for entry in attendee)
 
 
-def test_api_config_patch_language_streams(organizer_client, event, room, mocker):
-    mocker.patch("interpretation.signals._do_sync_single_room_to_voxbento")
+def test_api_config_patch_language_streams(organizer_client, event, room, monkeypatch):
+    monkeypatch.setattr("interpretation.signals._do_sync_single_room_to_voxbento", lambda *args, **kwargs: False)
     event.plugins = "interpretation"
     event.save(update_fields=["plugins"])
     event.settings.set(SETTING_USE_PLUGIN_STREAMS, True)
     from interpretation.models import VoxbentoOAuthGrant
+
     event.settings.set("interpretation_voxbento_base_url", "https://v.example")
     VoxbentoOAuthGrant.objects.get_or_create(event=event, defaults={"access_token": "t", "is_disconnected": False})
     RoomInterpretation.objects.create(interpreter="voxbento", room_enabled=True, room=room)
