@@ -32,7 +32,9 @@ def augment_room_config(room, room_config: dict) -> None:
         except VoxbentoError:
             base_url = None
         grant = getattr(event, "voxbento_oauth_grant", None)
-        has_active_grant = grant and not getattr(grant, "is_disconnected", False)
+        has_active_grant = (
+            grant and not getattr(grant, "is_disconnected", False) and bool(getattr(grant, "access_token", ""))
+        )
         if not (base_url and has_active_grant):
             room_config["interpretation_use_plugin_streams"] = False
             return
