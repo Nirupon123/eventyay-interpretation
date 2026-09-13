@@ -118,11 +118,20 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
             base_url = None
 
         grant = getattr(event, "voxbento_oauth_grant", None)
-        has_active_grant = grant and not getattr(grant, "is_disconnected", False)
+        has_active_grant = (
+            grant and not getattr(grant, "is_disconnected", False) and bool(getattr(grant, "access_token", ""))
+        )
         if base_url and has_active_grant:
             allow_blank = True
 
-    streams = [entry for entry in (stored_streams or []) if is_usable_stream_entry(entry, allow_blank=allow_blank)]
+    streams = []
+    for entry in stored_streams or []:
+        if not is_usable_stream_entry(entry, allow_blank=allow_blank):
+            continue
+        source = entry.get("youtube_id") or entry.get("audio_source") or ""
+        if not has_active_grant and base_url and source.startswith(base_url):
+            continue
+        streams.append(entry)
     normalized = [normalize_stream_entry(entry) for entry in streams]
     if not any(entry["language"] == ORIGINAL_LANGUAGE for entry in normalized):
         normalized.insert(
@@ -138,7 +147,9 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
     if event and room:
         from .language_map import language_code_for_name
 
-        has_active_grant = grant and not getattr(grant, "is_disconnected", False)
+        has_active_grant = (
+            grant and not getattr(grant, "is_disconnected", False) and bool(getattr(grant, "access_token", ""))
+        )
         if base_url and has_active_grant:
             parsed = urlparse(base_url)
             scheme = "wss" if parsed.scheme == "https" else "ws"
