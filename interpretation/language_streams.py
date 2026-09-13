@@ -109,6 +109,7 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
     allow_blank = False
     base_url = None
     grant = None
+    has_active_grant = False
     if event and room:
         from .backends.voxbento_credentials import VoxbentoError, get_voxbento_base_url
 
