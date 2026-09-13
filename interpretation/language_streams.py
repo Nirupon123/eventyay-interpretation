@@ -118,7 +118,8 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
             base_url = None
 
         grant = getattr(event, "voxbento_oauth_grant", None)
-        if base_url and grant:
+        has_active_grant = grant and not getattr(grant, "is_disconnected", False)
+        if base_url and has_active_grant:
             allow_blank = True
 
     streams = [entry for entry in (stored_streams or []) if is_usable_stream_entry(entry, allow_blank=allow_blank)]
@@ -137,7 +138,8 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
     if event and room:
         from .language_map import language_code_for_name
 
-        if base_url and grant:
+        has_active_grant = grant and not getattr(grant, "is_disconnected", False)
+        if base_url and has_active_grant:
             parsed = urlparse(base_url)
             scheme = "wss" if parsed.scheme == "https" else "ws"
             ws_base = f"{scheme}://{parsed.netloc}{parsed.path.rstrip('/')}"
