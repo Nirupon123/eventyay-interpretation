@@ -308,8 +308,47 @@ class InterpretationRoomSettings(
                 {
                     "interpreter": form.cleaned_data["interpreter"],
                     "room_enabled": form.cleaned_data.get("room_enabled"),
+                    "enable_transcription": form.cleaned_data.get("enable_transcription"),
+                    "transcription_provider": form.cleaned_data.get("transcription_provider"),
+                    "transcription_model": form.cleaned_data.get("transcription_model"),
+                    "source_language": form.cleaned_data.get("source_language"),
+                    "enable_translation": form.cleaned_data.get("enable_translation"),
+                    "translation_provider": form.cleaned_data.get("translation_provider"),
+                    "translation_model": form.cleaned_data.get("translation_model"),
                 },
             )
+
+            # Handle API Keys
+            api_keys = [
+                "openai_api_key",
+                "deepgram_api_key",
+                "nvidia_api_key",
+                "elevenlabs_api_key",
+                "translation_openai_api_key",
+                "openrouter_api_key",
+                "gemini_api_key",
+                "anthropic_api_key",
+                "groq_api_key",
+            ]
+
+            if form.cleaned_data.get("interpreter") == "voxbento":
+                from .models import VoxbentoOAuthGrant
+
+                grant = VoxbentoOAuthGrant.objects.filter(event=event).first()
+                if grant:
+                    updated_keys = False
+                    for key in api_keys:
+                        val = form.cleaned_data.get(key)
+                        if val:
+                            setattr(grant, key, val)
+                            updated_keys = True
+
+                    if updated_keys:
+                        grant.save(update_fields=api_keys)
+                        from .backends.voxbento_api import sync_voxbento_api_keys
+
+                        sync_voxbento_api_keys(event)
+
         except ValueError as exc:
             return None, str(exc)
         return interpretation, None
@@ -386,6 +425,13 @@ class InterpretationRoomSettings(
                         initial={
                             "interpreter": data["interpreter"],
                             "room_enabled": data["room_enabled"],
+                            "enable_transcription": data["enable_transcription"],
+                            "transcription_provider": data["transcription_provider"],
+                            "transcription_model": data["transcription_model"],
+                            "source_language": data["source_language"],
+                            "enable_translation": data["enable_translation"],
+                            "translation_provider": data["translation_provider"],
+                            "translation_model": data["translation_model"],
                         },
                     ),
                     "interpreter_configured": is_interpreter_configured(event, selected),

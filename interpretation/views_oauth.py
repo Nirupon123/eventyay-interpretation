@@ -27,7 +27,7 @@ def generate_pkce():
 class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
     permission = "can_change_event_settings"
 
-    def get(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         event = self.request.event
         client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
         if not client_id:

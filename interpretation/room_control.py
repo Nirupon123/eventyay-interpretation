@@ -106,7 +106,12 @@ def serialize_room_interpretation(room, event, interpretation=None) -> dict:
         "available_interpreters": list_available_interpreters(event),
         "target_languages": list(interpretation.target_languages or []) if interpretation else [],
         "transcription_provider": interpretation.transcription_provider if interpretation else "",
+        "transcription_model": interpretation.transcription_model if interpretation else "",
+        "enable_transcription": interpretation.enable_transcription if interpretation else False,
         "translation_provider": interpretation.translation_provider if interpretation else "",
+        "translation_model": interpretation.translation_model if interpretation else "",
+        "enable_translation": interpretation.enable_translation if interpretation else False,
+        "source_language": interpretation.source_language if interpretation else "",
         "backend_config": _public_backend_config(interpretation),
         "status": normalize_session_status(interpretation.status if interpretation else RoomInterpretation.STATUS_IDLE),
         "session_id": _public_session_id(interpretation),
@@ -136,10 +141,20 @@ def _apply_backend_config(interpretation: RoomInterpretation, data: dict) -> Non
             interpretation,
             data["backend_config"],
         )
+    if "enable_transcription" in data:
+        interpretation.enable_transcription = data.get("enable_transcription") is True
     if "transcription_provider" in data:
         interpretation.transcription_provider = (data.get("transcription_provider") or "").strip()
+    if "transcription_model" in data:
+        interpretation.transcription_model = (data.get("transcription_model") or "").strip()
+    if "source_language" in data:
+        interpretation.source_language = (data.get("source_language") or "").strip()
+    if "enable_translation" in data:
+        interpretation.enable_translation = data.get("enable_translation") is True
     if "translation_provider" in data:
         interpretation.translation_provider = (data.get("translation_provider") or "").strip()
+    if "translation_model" in data:
+        interpretation.translation_model = (data.get("translation_model") or "").strip()
 
 
 def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:

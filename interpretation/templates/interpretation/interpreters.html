@@ -51,9 +51,12 @@
                                 {% csrf_token %}
                                 <input type="hidden" name="interpretation_interpreter_id" value="{{ entry.id }}">
                                 {% if entry.is_disconnected and entry.id == "voxbento" %}
-                                    <a href="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}" class="btn btn-primary btn-sm" style="margin-right: 10px;">
-                                        <i class="fa fa-plug"></i> {% trans "Reconnect" %}
-                                    </a>
+                                    <form method="post" action="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}" style="display:inline-block; margin-right: 10px;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            <i class="fa fa-plug"></i> {% trans "Reconnect" %}
+                                        </button>
+                                    </form>
                                 {% else %}
                                     <button type="submit"
                                             name="interpretation_interpreter_action"
@@ -90,9 +93,12 @@
                             <p>
                                 {% trans "VoxBento is configured globally by the system administrator. Connect your event to VoxBento using OAuth." %}
                             </p>
-                            <a href="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}" class="btn btn-primary">
-                                <i class="fa fa-plug"></i> {% trans "Connect with VoxBento" %}
-                            </a>
+                            <form method="post" action="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-plug"></i> {% trans "Connect with VoxBento" %}
+                                </button>
+                            </form>
                         </div>
                     {% else %}
                         <form method="post" class="interpretation-interpreter-connect-form">

@@ -14,7 +14,6 @@ from .backends.voxbento_api import (
 )
 from .backends.voxbento_credentials import get_voxbento_base_url
 from .language_map import language_code_for_name
-from .models import RoomInterpretation
 
 logger = logging.getLogger(__name__)
 
@@ -126,17 +125,25 @@ def _do_sync_single_room_to_voxbento(
             return False
 
         room = room_instance if room_instance else Room.objects.get(id=room_id)
+        from .models import RoomInterpretation
+
+        interpretation = RoomInterpretation.objects.filter(room_id=room.id).first()
 
         payload = {
             "name": str(room.name),
             "target_languages": [],
+            "enable_transcription": getattr(interpretation, "enable_transcription", False) if interpretation else False,
+            "transcription_provider": getattr(interpretation, "transcription_provider", "") if interpretation else "",
+            "transcription_model": getattr(interpretation, "transcription_model", "") if interpretation else "",
+            "enable_translation": getattr(interpretation, "enable_translation", False) if interpretation else False,
+            "translation_provider": getattr(interpretation, "translation_provider", "") if interpretation else "",
+            "translation_model": getattr(interpretation, "translation_model", "") if interpretation else "",
         }
 
         from interpretation.backends.voxbento_api import get_voxbento_room_langs
         from interpretation.settings import use_plugin_language_streams
 
         use_plugin_streams = use_plugin_language_streams(event)
-        interpretation = getattr(room, "interpretation", None)
         if use_plugin_streams:
             if (
                 interpretation
