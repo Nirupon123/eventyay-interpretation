@@ -164,12 +164,12 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
 
     # Validation: Enforce AI Configuration Invariants
     trans_enabled = data.get("enable_transcription", interpretation.enable_transcription)
-    trans_provider = data.get("transcription_provider", interpretation.transcription_provider)
-    trans_model = data.get("transcription_model", interpretation.transcription_model)
+    trans_provider = (data.get("transcription_provider", interpretation.transcription_provider) or "").strip()
+    trans_model = (data.get("transcription_model", interpretation.transcription_model) or "").strip()
 
     transl_enabled = data.get("enable_translation", interpretation.enable_translation)
-    transl_provider = data.get("translation_provider", interpretation.translation_provider)
-    transl_model = data.get("translation_model", interpretation.translation_model)
+    transl_provider = (data.get("translation_provider", interpretation.translation_provider) or "").strip()
+    transl_model = (data.get("translation_model", interpretation.translation_model) or "").strip()
 
     if trans_enabled:
         if not trans_provider:

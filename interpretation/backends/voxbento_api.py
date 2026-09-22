@@ -266,7 +266,7 @@ def sync_voxbento_api_keys(event: Event) -> None:
     api_url = f"{base_url.rstrip('/')}/api/v1/events/{event.slug}/api_keys"
     access_token = get_valid_access_token(grant.id)
     if not access_token:
-        return
+        raise ValueError("Cannot synchronize API keys: Requires an active OAuth connection.")
 
     payload = {
         "openai_api_key": grant.openai_api_key,
@@ -285,8 +285,17 @@ def sync_voxbento_api_keys(event: Event) -> None:
         "Content-Type": "application/json",
     }
 
-    try:
+    resp = requests.patch(api_url, headers=headers, json=payload, timeout=5.0)
+
+    if resp.status_code == 404:
+        logger.warning(
+            "VoxBento returned 404 Not Found for API keys sync on event %s. Attempting to provision event.",
+            event.id,
+        )
+        create_voxbento_event(event)
         resp = requests.patch(api_url, headers=headers, json=payload, timeout=5.0)
+
+    try:
         resp.raise_for_status()
     except requests.RequestException as e:
         logger.error("Failed to sync API keys to VoxBento for event %s: %s", event.id, e)

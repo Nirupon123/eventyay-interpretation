@@ -76,6 +76,7 @@
                 </div>
             </div>
         </div>
+    </div>
 
     <div class="voxbento-ai-config" style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
         <h4>{% trans "Event Audio Translation" %}</h4>
@@ -118,6 +119,7 @@
                 </div>
             </div>
         </div>
+    </div>
 
     <div class="interpretation-room-form-actions">
         <button type="submit" name="{{ room_action_key }}" value="save" class="btn btn-default">
@@ -187,6 +189,18 @@
             var transcriptionFields = form.querySelector('.transcription-fields');
             var translationFields = form.querySelector('.translation-fields');
 
+            var configuredKeys = {
+                'openai': {{ entry.configure_form.configured_api_keys.openai|yesno:"true,false" }},
+                'deepgram': {{ entry.configure_form.configured_api_keys.deepgram|yesno:"true,false" }},
+                'nvidia': {{ entry.configure_form.configured_api_keys.nvidia|yesno:"true,false" }},
+                'elevenlabs': {{ entry.configure_form.configured_api_keys.elevenlabs|yesno:"true,false" }},
+                'translation_openai': {{ entry.configure_form.configured_api_keys.translation_openai|yesno:"true,false" }},
+                'openrouter': {{ entry.configure_form.configured_api_keys.openrouter|yesno:"true,false" }},
+                'gemini': {{ entry.configure_form.configured_api_keys.gemini|yesno:"true,false" }},
+                'anthropic': {{ entry.configure_form.configured_api_keys.anthropic|yesno:"true,false" }},
+                'groq': {{ entry.configure_form.configured_api_keys.groq|yesno:"true,false" }}
+            };
+
             function updateVisibility() {
                 var isVoxbento = interpreterSelect && interpreterSelect.value === 'voxbento';
                 var isRoomEnabled = enableRoom ? enableRoom.checked : false;
@@ -222,6 +236,13 @@
                         trInputs.forEach(function(inp) {
                             inp.disabled = !translOn;
                         });
+                    }
+
+                    if (typeof updateAPIKeys === 'function') {
+                        var transProviderSelectEl = form.querySelector('[name$="-transcription_provider"]');
+                        var translProviderSelectEl = form.querySelector('[name$="-translation_provider"]');
+                        if (transProviderSelectEl) updateAPIKeys(transProviderSelectEl, 'transcription');
+                        if (translProviderSelectEl) updateAPIKeys(translProviderSelectEl, 'translation');
                     }
                 }
             }
@@ -309,18 +330,6 @@
                 }
             }
 
-            var configuredKeys = {
-                'openai': {{ entry.configure_form.configured_api_keys.openai|yesno:"true,false" }},
-                'deepgram': {{ entry.configure_form.configured_api_keys.deepgram|yesno:"true,false" }},
-                'nvidia': {{ entry.configure_form.configured_api_keys.nvidia|yesno:"true,false" }},
-                'elevenlabs': {{ entry.configure_form.configured_api_keys.elevenlabs|yesno:"true,false" }},
-                'translation_openai': {{ entry.configure_form.configured_api_keys.translation_openai|yesno:"true,false" }},
-                'openrouter': {{ entry.configure_form.configured_api_keys.openrouter|yesno:"true,false" }},
-                'gemini': {{ entry.configure_form.configured_api_keys.gemini|yesno:"true,false" }},
-                'anthropic': {{ entry.configure_form.configured_api_keys.anthropic|yesno:"true,false" }},
-                'groq': {{ entry.configure_form.configured_api_keys.groq|yesno:"true,false" }}
-            };
-
             if (transProviderSelect) {
                 transProviderSelect.addEventListener('change', function() {
                     cascadeModels(transProviderSelect, transModelSelect, masterTransModelSelect, transProviderLabelMap);
@@ -343,7 +352,14 @@
                 var container = form.querySelector('.api-key-container[data-purpose="' + purpose + '"]');
                 if (!container) return;
                 
-                if (provider && provider !== 'local') {
+                var isFeatureEnabled = false;
+                if (purpose === 'transcription' && enableTranscription) {
+                    isFeatureEnabled = enableTranscription.checked;
+                } else if (purpose === 'translation' && enableTranslation) {
+                    isFeatureEnabled = enableTranslation.checked;
+                }
+                
+                if (isFeatureEnabled && provider && provider !== 'local') {
                     container.style.display = 'block';
                     var statusDiv = container.querySelector('.api-key-status');
                     var inputDiv = container.querySelector('.api-key-input');
