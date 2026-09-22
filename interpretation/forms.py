@@ -156,6 +156,7 @@ def get_language_choices():
     except Exception:
         return [("", _("Select a Language...")), ("en", "English (en)")]
 
+
 class RoomConfigureForm(forms.Form):
     """Per-room interpreter selection."""
 
