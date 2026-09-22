@@ -135,6 +135,7 @@ def _do_sync_single_room_to_voxbento(
             "enable_transcription": getattr(interpretation, "enable_transcription", False) if interpretation else False,
             "transcription_provider": getattr(interpretation, "transcription_provider", "") if interpretation else "",
             "transcription_model": getattr(interpretation, "transcription_model", "") if interpretation else "",
+            "source_language": getattr(interpretation, "source_language", "") if interpretation else "",
             "enable_translation": getattr(interpretation, "enable_translation", False) if interpretation else False,
             "translation_provider": getattr(interpretation, "translation_provider", "") if interpretation else "",
             "translation_model": getattr(interpretation, "translation_model", "") if interpretation else "",

@@ -137,6 +137,24 @@ def room_form_prefix(room_id: int) -> str:
     return f"room-{room_id}"
 
 
+import os
+
+def get_language_choices():
+    map_path = os.path.join(os.path.dirname(__file__), "language_map.yml")
+    try:
+        with open(map_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            choices = [("", _("Select a Language..."))]
+            for line in lines:
+                if ":" in line:
+                    lang, code = line.split(":", 1)
+                    lang = lang.strip()
+                    code = code.strip().strip("'\"")
+                    choices.append((code, f"{lang} ({code})"))
+            return choices
+    except Exception:
+        return [("", _("Select a Language...")), ("en", "English (en)")]
+
 class RoomConfigureForm(forms.Form):
     """Per-room interpreter selection."""
 
@@ -149,7 +167,7 @@ class RoomConfigureForm(forms.Form):
         required=False,
     )
     enable_transcription = forms.BooleanField(
-        label=_("Enable AI Transcription for Floor Audio"),
+        label=_("Enable AI Transcription for Event Audio"),
         required=False,
     )
     transcription_provider = forms.ChoiceField(
@@ -172,12 +190,8 @@ class RoomConfigureForm(forms.Form):
             (
                 _("Local"),
                 (
-                    ("tiny", "tiny"),
+                    ("tiny", "tiny (Fastest)"),
                     ("base", "base"),
-                    ("small", "small"),
-                    ("medium", "medium"),
-                    ("large-v2", "large-v2"),
-                    ("large-v3", "large-v3"),
                 ),
             ),
             (
@@ -199,13 +213,14 @@ class RoomConfigureForm(forms.Form):
             (_("ElevenLabs"), (("scribe_v2_realtime", "scribe_v2_realtime"),)),
         ],
     )
-    source_language = forms.CharField(
-        label=_("Floor Language Code"),
+    source_language = forms.ChoiceField(
+        label=_("Event Language"),
         required=False,
-        widget=forms.TextInput(attrs={"placeholder": "en"}),
+        choices=[],
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
     enable_translation = forms.BooleanField(
-        label=_("Enable Real-Time LLM Translation for Floor Audio"),
+        label=_("Enable Real-Time LLM Translation for Event Audio"),
         required=False,
     )
     translation_provider = forms.ChoiceField(
@@ -252,6 +267,7 @@ class RoomConfigureForm(forms.Form):
 
         interpreters = list_available_interpreters(event)
         self.fields["interpreter"].choices = [(item["id"], item["label"]) for item in interpreters]
+        self.fields["source_language"].choices = get_language_choices()
         self.fields["translation_provider"].choices = [
             ("", _("Select a Provider...")),
             ("local", _("Local LLM")),
@@ -356,8 +372,14 @@ class RoomConfigureForm(forms.Form):
             # Validation for AI Interpretation fields
             enable_transcription = cleaned_data.get("enable_transcription", False)
             if enable_transcription:
-                if not cleaned_data.get("transcription_provider"):
+                provider = cleaned_data.get("transcription_provider")
+                if not provider:
                     self.add_error("transcription_provider", _("This field is required when transcription is enabled."))
+                elif provider != "local":
+                    key_map_name = provider
+                    if not cleaned_data.get(f"{key_map_name}_api_key") and not self.configured_api_keys.get(key_map_name):
+                        self.add_error(f"{key_map_name}_api_key", _("API key is required for this provider."))
+                
                 if not cleaned_data.get("transcription_model"):
                     self.add_error("transcription_model", _("This field is required when transcription is enabled."))
 
@@ -367,8 +389,14 @@ class RoomConfigureForm(forms.Form):
                     self.add_error(
                         "enable_translation", _("Floor Audio Transcription must be enabled to use translation.")
                     )
-                if not cleaned_data.get("translation_provider"):
+                provider = cleaned_data.get("translation_provider")
+                if not provider:
                     self.add_error("translation_provider", _("This field is required when translation is enabled."))
+                elif provider != "local":
+                    key_map_name = provider if provider != "openai" else "translation_openai"
+                    if not cleaned_data.get(f"{key_map_name}_api_key") and not self.configured_api_keys.get(key_map_name):
+                        self.add_error(f"{key_map_name}_api_key", _("API key is required for this provider."))
+
                 if not cleaned_data.get("translation_model"):
                     self.add_error("translation_model", _("This field is required when translation is enabled."))
 
