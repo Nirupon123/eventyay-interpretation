@@ -139,6 +139,7 @@ def room_form_prefix(room_id: int) -> str:
 
 import os
 
+
 def get_language_choices():
     map_path = os.path.join(os.path.dirname(__file__), "language_map.yml")
     try:
@@ -377,9 +378,10 @@ class RoomConfigureForm(forms.Form):
                     self.add_error("transcription_provider", _("This field is required when transcription is enabled."))
                 elif provider != "local":
                     key_map_name = provider
-                    if not cleaned_data.get(f"{key_map_name}_api_key") and not self.configured_api_keys.get(key_map_name):
+                    api_key = cleaned_data.get(f"{key_map_name}_api_key")
+                    if not api_key and not self.configured_api_keys.get(key_map_name):
                         self.add_error(f"{key_map_name}_api_key", _("API key is required for this provider."))
-                
+
                 if not cleaned_data.get("transcription_model"):
                     self.add_error("transcription_model", _("This field is required when transcription is enabled."))
 
@@ -394,7 +396,8 @@ class RoomConfigureForm(forms.Form):
                     self.add_error("translation_provider", _("This field is required when translation is enabled."))
                 elif provider != "local":
                     key_map_name = provider if provider != "openai" else "translation_openai"
-                    if not cleaned_data.get(f"{key_map_name}_api_key") and not self.configured_api_keys.get(key_map_name):
+                    api_key = cleaned_data.get(f"{key_map_name}_api_key")
+                    if not api_key and not self.configured_api_keys.get(key_map_name):
                         self.add_error(f"{key_map_name}_api_key", _("API key is required for this provider."))
 
                 if not cleaned_data.get("translation_model"):

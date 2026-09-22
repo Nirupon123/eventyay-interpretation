@@ -162,6 +162,29 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
     was_running = bool(interpretation.backend_session_id)
     old_interpreter = interpretation.interpreter
 
+    # Validation: Enforce AI Configuration Invariants
+    trans_enabled = data.get("enable_transcription", interpretation.enable_transcription)
+    trans_provider = data.get("transcription_provider", interpretation.transcription_provider)
+    trans_model = data.get("transcription_model", interpretation.transcription_model)
+
+    transl_enabled = data.get("enable_translation", interpretation.enable_translation)
+    transl_provider = data.get("translation_provider", interpretation.translation_provider)
+    transl_model = data.get("translation_model", interpretation.translation_model)
+
+    if trans_enabled:
+        if not trans_provider:
+            raise ValueError(_("Transcription provider is required when transcription is enabled."))
+        if not trans_model:
+            raise ValueError(_("Transcription model is required when transcription is enabled."))
+
+    if transl_enabled:
+        if not trans_enabled:
+            raise ValueError(_("Floor Audio Transcription must be enabled to use translation."))
+        if not transl_provider:
+            raise ValueError(_("Translation provider is required when translation is enabled."))
+        if not transl_model:
+            raise ValueError(_("Translation model is required when translation is enabled."))
+
     if "interpreter" in data:
         interpreter = (data.get("interpreter") or RoomInterpretation.INTERPRETER_NONE).strip()
         if not is_known_interpreter(interpreter):

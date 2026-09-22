@@ -290,6 +290,7 @@ def sync_voxbento_api_keys(event: Event) -> None:
         resp.raise_for_status()
     except requests.RequestException as e:
         logger.error("Failed to sync API keys to VoxBento for event %s: %s", event.id, e)
+        raise ValueError(f"Failed to synchronize API keys with VoxBento: {e}")
 
 
 def delete_voxbento_room(event: Event, room_id: int) -> None:

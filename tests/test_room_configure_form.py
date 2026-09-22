@@ -32,16 +32,20 @@ def test_room_configure_form_lists_interpreters():
     assert RoomInterpretation.INTERPRETER_SUSI not in ids
 
 
-def test_room_configure_form_accepts_interpreter_and_enabled(event):
+@pytest.fixture
+def connected_event(event):
     from interpretation.models import VoxbentoOAuthGrant
 
     event.plugins = "interpretation"
     event.save(update_fields=["plugins"])
     event.settings.set("interpretation_voxbento_base_url", "https://v.example")
     VoxbentoOAuthGrant.objects.create(event=event, access_token="t", is_disconnected=False)
+    return event
 
+
+def test_room_configure_form_accepts_interpreter_and_enabled(connected_event):
     form = RoomConfigureForm(
-        event=event,
+        event=connected_event,
         data={
             "interpreter": RoomInterpretation.INTERPRETER_VOXBENTO,
             "room_enabled": True,
@@ -52,9 +56,9 @@ def test_room_configure_form_accepts_interpreter_and_enabled(event):
     assert form.cleaned_data["room_enabled"] is True
 
 
-def test_room_configure_form_validates_transcription_fields(event):
+def test_room_configure_form_validates_transcription_fields(connected_event):
     form = RoomConfigureForm(
-        event=event,
+        event=connected_event,
         data={
             "interpreter": RoomInterpretation.INTERPRETER_VOXBENTO,
             "room_enabled": True,
@@ -68,7 +72,7 @@ def test_room_configure_form_validates_transcription_fields(event):
     assert "transcription_model" in form.errors
 
     form = RoomConfigureForm(
-        event=event,
+        event=connected_event,
         data={
             "interpreter": RoomInterpretation.INTERPRETER_VOXBENTO,
             "room_enabled": True,
@@ -80,9 +84,9 @@ def test_room_configure_form_validates_transcription_fields(event):
     assert form.is_valid()
 
 
-def test_room_configure_form_validates_translation_fields(event):
+def test_room_configure_form_validates_translation_fields(connected_event):
     form = RoomConfigureForm(
-        event=event,
+        event=connected_event,
         data={
             "interpreter": RoomInterpretation.INTERPRETER_VOXBENTO,
             "room_enabled": True,
@@ -96,7 +100,7 @@ def test_room_configure_form_validates_translation_fields(event):
     assert "enable_translation" in form.errors  # Requires transcription
 
     form = RoomConfigureForm(
-        event=event,
+        event=connected_event,
         data={
             "interpreter": RoomInterpretation.INTERPRETER_VOXBENTO,
             "room_enabled": True,
@@ -113,7 +117,7 @@ def test_room_configure_form_validates_translation_fields(event):
     assert "translation_model" in form.errors
 
     form = RoomConfigureForm(
-        event=event,
+        event=connected_event,
         data={
             "interpreter": RoomInterpretation.INTERPRETER_VOXBENTO,
             "room_enabled": True,
