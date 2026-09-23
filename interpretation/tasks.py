@@ -133,12 +133,12 @@ def _do_sync_single_room_to_voxbento(
             "name": str(room.name),
             "target_languages": [],
             "enable_transcription": getattr(interpretation, "enable_transcription", False) if interpretation else False,
-            "transcription_provider": getattr(interpretation, "transcription_provider", "") if interpretation else "",
-            "transcription_model": getattr(interpretation, "transcription_model", "") if interpretation else "",
-            "source_language": getattr(interpretation, "source_language", "") if interpretation else "",
+            "transcription_provider": (getattr(interpretation, "transcription_provider", "") or None) if interpretation else None,
+            "transcription_model": (getattr(interpretation, "transcription_model", "") or None) if interpretation else None,
+            "source_language": (getattr(interpretation, "source_language", "") or None) if interpretation else None,
             "enable_translation": getattr(interpretation, "enable_translation", False) if interpretation else False,
-            "translation_provider": getattr(interpretation, "translation_provider", "") if interpretation else "",
-            "translation_model": getattr(interpretation, "translation_model", "") if interpretation else "",
+            "translation_provider": (getattr(interpretation, "translation_provider", "") or None) if interpretation else None,
+            "translation_model": (getattr(interpretation, "translation_model", "") or None) if interpretation else None,
         }
 
         from interpretation.backends.voxbento_api import get_voxbento_room_langs

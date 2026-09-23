@@ -358,11 +358,20 @@ class InterpretationRoomSettings(
         if error is not None:
             if isinstance(error, str):
                 messages.error(request, error)
+                form = RoomConfigureForm(request.POST, prefix=prefix, event=event)
             else:
                 for field, field_errors in error.errors.items():
                     for err in field_errors:
                         messages.error(request, err)
-            return redirect(redirect_url)
+                form = error
+
+            context = self.get_context_data()
+            for room_data in context["rooms"]:
+                if room_data["room"].pk == room.pk:
+                    room_data["configure_form"] = form
+                    room_data["expanded"] = True
+            from django.shortcuts import render
+            return render(request, self.template_name, context)
         if (
             interpretation
             and interpretation.interpreter != RoomInterpretation.INTERPRETER_NONE

@@ -162,6 +162,27 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
     was_running = bool(interpretation.backend_session_id)
     old_interpreter = interpretation.interpreter
 
+    if "interpreter" in data:
+        interpreter = (data.get("interpreter") or RoomInterpretation.INTERPRETER_NONE).strip()
+        if not is_known_interpreter(interpreter):
+            raise ValueError(_("Unknown interpreter."))
+        interpretation.interpreter = interpreter
+
+    if "room_enabled" in data:
+        interpretation.room_enabled = bool(data.get("room_enabled"))
+
+    is_active = interpretation.interpreter != RoomInterpretation.INTERPRETER_NONE and interpretation.room_enabled
+    if not is_active:
+        data["enable_transcription"] = False
+        data["transcription_provider"] = ""
+        data["transcription_model"] = ""
+        data["source_language"] = ""
+        data["enable_translation"] = False
+        data["translation_provider"] = ""
+        data["translation_model"] = ""
+        data["target_languages"] = []
+        data["language_streams"] = []
+
     # Validation: Enforce AI Configuration Invariants
     trans_enabled = data.get("enable_transcription", interpretation.enable_transcription)
     trans_provider = (data.get("transcription_provider", interpretation.transcription_provider) or "").strip()
@@ -176,6 +197,10 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
             raise ValueError(_("Transcription provider is required when transcription is enabled."))
         if not trans_model:
             raise ValueError(_("Transcription model is required when transcription is enabled."))
+    else:
+        # Force clear them if the feature is disabled
+        data["transcription_provider"] = ""
+        data["transcription_model"] = ""
 
     if transl_enabled:
         if not trans_enabled:
@@ -184,15 +209,10 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
             raise ValueError(_("Translation provider is required when translation is enabled."))
         if not transl_model:
             raise ValueError(_("Translation model is required when translation is enabled."))
-
-    if "interpreter" in data:
-        interpreter = (data.get("interpreter") or RoomInterpretation.INTERPRETER_NONE).strip()
-        if not is_known_interpreter(interpreter):
-            raise ValueError(_("Unknown interpreter."))
-        interpretation.interpreter = interpreter
-
-    if "room_enabled" in data:
-        interpretation.room_enabled = bool(data.get("room_enabled"))
+    else:
+        # Force clear them if the feature is disabled
+        data["translation_provider"] = ""
+        data["translation_model"] = ""
 
     if "target_languages" in data:
         interpretation.target_languages = validate_target_language_codes(
