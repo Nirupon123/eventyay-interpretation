@@ -236,7 +236,7 @@ def sync_voxbento_room(event: Event, room_id: int, payload: dict) -> dict:
         )
         create_voxbento_event(event)
         # Retry the request
-        print("VOXBENTO_PAYLOAD_DEBUG:", api_url, payload)
+        logger.debug("VOXBENTO_PAYLOAD_DEBUG: %s %s", api_url, payload)
         resp = requests.put(api_url, headers=headers, json=payload, timeout=5.0)
 
     if resp.status_code == 409:
@@ -264,9 +264,12 @@ def sync_voxbento_api_keys(event: Event) -> None:
         return
 
     api_url = f"{base_url.rstrip('/')}/api/v1/events/{event.slug}/api_keys"
-    access_token = get_valid_access_token(grant.id)
-    if not access_token:
-        raise ValueError("Cannot synchronize API keys: Requires an active OAuth connection.")
+    try:
+        access_token = get_valid_access_token(grant.id)
+        if not access_token:
+            raise ValueError("Cannot synchronize API keys: Requires an active OAuth connection.")
+    except requests.RequestException as e:
+        raise ValueError(f"Cannot synchronize API keys: Network error ({e})")
 
     payload = {
         "openai_api_key": grant.openai_api_key,
