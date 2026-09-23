@@ -288,17 +288,17 @@ def sync_voxbento_api_keys(event: Event) -> None:
         "Content-Type": "application/json",
     }
 
-    resp = requests.patch(api_url, headers=headers, json=payload, timeout=5.0)
-
-    if resp.status_code == 404:
-        logger.warning(
-            "VoxBento returned 404 Not Found for API keys sync on event %s. Attempting to provision event.",
-            event.id,
-        )
-        create_voxbento_event(event)
+    try:
         resp = requests.patch(api_url, headers=headers, json=payload, timeout=5.0)
 
-    try:
+        if resp.status_code == 404:
+            logger.warning(
+                "VoxBento returned 404 Not Found for API keys sync on event %s. Attempting to provision event.",
+                event.id,
+            )
+            create_voxbento_event(event)
+            resp = requests.patch(api_url, headers=headers, json=payload, timeout=5.0)
+
         resp.raise_for_status()
     except requests.RequestException as e:
         logger.error("Failed to sync API keys to VoxBento for event %s: %s", event.id, e)
