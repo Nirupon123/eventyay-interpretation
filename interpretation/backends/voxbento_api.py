@@ -6,7 +6,7 @@ from django.conf import settings
 from eventyay.base.models import Event
 
 from .voxbento_credentials import get_voxbento_base_url
-from .voxbento_oauth import get_valid_access_token
+from .voxbento_oauth import VoxbentoReauthorizationRequired, get_valid_access_token
 
 logger = logging.getLogger(__name__)
 
@@ -268,6 +268,8 @@ def sync_voxbento_api_keys(event: Event) -> None:
         access_token = get_valid_access_token(grant.id)
         if not access_token:
             raise ValueError("Cannot synchronize API keys: Requires an active OAuth connection.")
+    except VoxbentoReauthorizationRequired:
+        raise
     except requests.RequestException as e:
         raise ValueError(f"Cannot synchronize API keys: Network error ({e})")
 

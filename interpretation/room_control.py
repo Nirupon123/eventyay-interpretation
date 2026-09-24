@@ -158,6 +158,9 @@ def _apply_backend_config(interpretation: RoomInterpretation, data: dict) -> Non
 
 
 def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
+    if hasattr(data, "copy"):
+        data = data.copy()
+
     interpretation, _created = RoomInterpretation.objects.get_or_create(room=room)
     was_running = bool(interpretation.backend_session_id)
     old_interpreter = interpretation.interpreter
@@ -170,18 +173,6 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
 
     if "room_enabled" in data:
         interpretation.room_enabled = bool(data.get("room_enabled"))
-
-    is_active = interpretation.interpreter != RoomInterpretation.INTERPRETER_NONE and interpretation.room_enabled
-    if not is_active:
-        data["enable_transcription"] = False
-        data["transcription_provider"] = ""
-        data["transcription_model"] = ""
-        data["source_language"] = ""
-        data["enable_translation"] = False
-        data["translation_provider"] = ""
-        data["translation_model"] = ""
-        data["target_languages"] = []
-        data["language_streams"] = []
 
     # Validation: Enforce AI Configuration Invariants
     trans_enabled = data.get("enable_transcription", interpretation.enable_transcription)
@@ -344,6 +335,15 @@ def clear_room_interpretation_setup(room, event) -> RoomInterpretation:
         {
             "interpreter": RoomInterpretation.INTERPRETER_NONE,
             "room_enabled": False,
+            "enable_transcription": False,
+            "transcription_provider": "",
+            "transcription_model": "",
+            "source_language": "",
+            "enable_translation": False,
+            "translation_provider": "",
+            "translation_model": "",
+            "target_languages": [],
+            "language_streams": [],
         },
     )
 

@@ -371,6 +371,7 @@ class InterpretationRoomSettings(
                     room_data["configure_form"] = form
                     room_data["expanded"] = True
             from django.shortcuts import render
+
             return render(request, self.template_name, context)
         if (
             interpretation
