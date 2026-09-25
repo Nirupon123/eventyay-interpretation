@@ -331,13 +331,13 @@ class InterpretationRoomSettings(
                     from .api_key_validator import validate_provider_key
 
                     tp = form.cleaned_data.get("transcription_provider")
-                    if tp and tp != "none":
+                    if form.cleaned_data.get("enable_transcription") and tp and tp != "none":
                         key_val = getattr(grant, f"{tp}_api_key", None)
                         if key_val and not validate_provider_key(tp, key_val):
                             return None, f"The API key for {tp} is invalid, expired, or revoked."
 
                     vp = form.cleaned_data.get("translation_provider")
-                    if vp and vp != "none":
+                    if form.cleaned_data.get("enable_translation") and vp and vp != "none":
                         key_name = "translation_openai_api_key" if vp == "openai" else f"{vp}_api_key"
                         key_val = getattr(grant, key_name, None)
                         if key_val and not validate_provider_key(vp, key_val):
@@ -377,7 +377,7 @@ class InterpretationRoomSettings(
             if isinstance(error, str):
                 messages.error(request, error)
                 is_api_error = "invalid, expired, or revoked" in error
-                
+
                 invalid_keys = {}
                 if is_api_error:
                     # Quick parse the error to find the provider so we can highlight the right box
@@ -389,7 +389,7 @@ class InterpretationRoomSettings(
                         for p in ["openai", "deepgram", "nvidia", "elevenlabs"]:
                             if p in error:
                                 invalid_keys[p] = True
-                                
+
                 form = RoomConfigureForm(request.POST, prefix=prefix, event=event, invalid_api_keys=invalid_keys)
             else:
                 for field, field_errors in error.errors.items():
@@ -465,14 +465,14 @@ class InterpretationRoomSettings(
                 from .api_key_validator import validate_provider_key
 
                 tp = data.get("transcription_provider")
-                if tp and tp != "none":
+                if data.get("enable_transcription") and tp and tp != "none":
                     key_val = getattr(grant, f"{tp}_api_key", None)
                     if key_val and not validate_provider_key(tp, key_val):
                         api_key_error = f"The API key for {tp} is invalid, expired, or revoked."
                         invalid_api_keys[tp] = True
 
                 vp = data.get("translation_provider")
-                if not api_key_error and vp and vp != "none":
+                if not api_key_error and data.get("enable_translation") and vp and vp != "none":
                     key_name = "translation_openai_api_key" if vp == "openai" else f"{vp}_api_key"
                     dict_key = "translation_openai" if vp == "openai" else vp
                     key_val = getattr(grant, key_name, None)
