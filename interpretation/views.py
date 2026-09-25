@@ -305,6 +305,46 @@ class InterpretationRoomSettings(
             from django.db import transaction
 
             sync_needed = False
+<<<<<<< HEAD
+=======
+            grant = None
+            api_keys = [
+                "openai_api_key",
+                "deepgram_api_key",
+                "nvidia_api_key",
+                "elevenlabs_api_key",
+                "translation_openai_api_key",
+                "openrouter_api_key",
+                "gemini_api_key",
+                "anthropic_api_key",
+                "groq_api_key",
+            ]
+
+            if form.cleaned_data.get("interpreter") == "voxbento":
+                from .models import VoxbentoOAuthGrant
+
+                grant = VoxbentoOAuthGrant.objects.filter(event=event).first()
+                if grant:
+                    for key in api_keys:
+                        val = form.cleaned_data.get(key)
+                        if val:
+                            setattr(grant, key, val)
+
+                    from .api_key_validator import validate_provider_key
+
+                    tp = form.cleaned_data.get("transcription_provider")
+                    if form.cleaned_data.get("enable_transcription") and tp and tp != "none":
+                        key_val = getattr(grant, f"{tp}_api_key", None)
+                        if key_val and not validate_provider_key(tp, key_val):
+                            return None, f"The API key for {tp} is invalid, expired, or revoked."
+
+                    vp = form.cleaned_data.get("translation_provider")
+                    if form.cleaned_data.get("enable_translation") and vp and vp != "none":
+                        key_name = "translation_openai_api_key" if vp == "openai" else f"{vp}_api_key"
+                        key_val = getattr(grant, key_name, None)
+                        if key_val and not validate_provider_key(vp, key_val):
+                            return None, f"The API key for {vp} (Translation) is invalid, expired, or revoked."
+>>>>>>> 37fde0a (fixed with the reviews)
 
             with transaction.atomic():
                 # Handle API Keys first inside transaction
