@@ -17,7 +17,7 @@ def get_webhook_target_url() -> str:
         host = getattr(settings, "INTERPRETATION_WEBHOOK_PUBLIC_HOST", None)
         if host:
             return urljoin(host, "/interpretation/voxbento/webhook/")
-            
+
     site_url = getattr(settings, "SITE_URL", "http://localhost:8000")
     return urljoin(site_url, "/interpretation/voxbento/webhook/")
 
