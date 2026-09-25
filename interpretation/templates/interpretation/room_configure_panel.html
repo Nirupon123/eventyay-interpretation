@@ -11,6 +11,8 @@
             {{ entry.configure_form.interpreter }}
         </div>
 
+
+
         {% if entry.data.interpreter != "none" and not entry.interpreter_configured %}
             <p class="text-warning interpretation-section-hint">
                 {% blocktrans trimmed %}
@@ -201,6 +203,18 @@
                 'groq': {{ entry.configure_form.configured_api_keys.groq|yesno:"true,false" }}
             };
 
+            var invalidKeys = {
+                'openai': {% if entry.configure_form.invalid_api_keys.openai %}true{% else %}false{% endif %},
+                'deepgram': {% if entry.configure_form.invalid_api_keys.deepgram %}true{% else %}false{% endif %},
+                'nvidia': {% if entry.configure_form.invalid_api_keys.nvidia %}true{% else %}false{% endif %},
+                'elevenlabs': {% if entry.configure_form.invalid_api_keys.elevenlabs %}true{% else %}false{% endif %},
+                'translation_openai': {% if entry.configure_form.invalid_api_keys.translation_openai %}true{% else %}false{% endif %},
+                'openrouter': {% if entry.configure_form.invalid_api_keys.openrouter %}true{% else %}false{% endif %},
+                'gemini': {% if entry.configure_form.invalid_api_keys.gemini %}true{% else %}false{% endif %},
+                'anthropic': {% if entry.configure_form.invalid_api_keys.anthropic %}true{% else %}false{% endif %},
+                'groq': {% if entry.configure_form.invalid_api_keys.groq %}true{% else %}false{% endif %}
+            };
+
             function updateVisibility() {
                 var isVoxbento = interpreterSelect && interpreterSelect.value === 'voxbento';
                 var isRoomEnabled = enableRoom ? enableRoom.checked : false;
@@ -374,6 +388,7 @@
                     inputField.name = prefix + keyMapName + '_api_key';
                     
                     var isConfigured = configuredKeys[keyMapName];
+                    var isInvalid = invalidKeys[keyMapName];
                     var cancelButton = inputDiv.querySelector('.btn-cancel-update');
                     var updateInlineButton = inputDiv.querySelector('.btn-save-key-inline');
                     
@@ -381,6 +396,26 @@
                         statusDiv.style.display = 'block';
                         inputDiv.style.display = 'none';
                         inputField.required = false;
+
+                        var wellDiv = container.querySelector('.well');
+                        var iconEl = statusDiv.querySelector('i.fa');
+                        var textEl = statusDiv.querySelector('strong');
+
+                        if (isInvalid) {
+                            wellDiv.style.backgroundColor = '#f2dede';
+                            wellDiv.style.borderColor = '#ebccd1';
+                            wellDiv.style.color = '#a94442';
+                            iconEl.className = 'fa fa-times text-danger';
+                            textEl.innerHTML = 'API Key is invalid, expired, or revoked. Please update it.';
+                            textEl.style.color = '#a94442';
+                        } else {
+                            wellDiv.style.backgroundColor = '#fcf8e3';
+                            wellDiv.style.borderColor = '#faebcc';
+                            wellDiv.style.color = '#8a6d3b';
+                            iconEl.className = 'fa fa-check text-success';
+                            textEl.innerHTML = 'API Key is already configured for this provider.';
+                            textEl.style.color = '';
+                        }
                     } else {
                         statusDiv.style.display = 'none';
                         inputDiv.style.display = 'block';
