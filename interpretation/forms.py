@@ -137,6 +137,26 @@ def room_form_prefix(room_id: int) -> str:
     return f"room-{room_id}"
 
 
+import os
+
+
+def get_language_choices():
+    map_path = os.path.join(os.path.dirname(__file__), "language_map.yml")
+    try:
+        with open(map_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            choices = [("", _("Select a Language..."))]
+            for line in lines:
+                if ":" in line:
+                    lang, code = line.split(":", 1)
+                    lang = lang.strip()
+                    code = code.strip().strip("'\"")
+                    choices.append((code, f"{lang} ({code})"))
+            return choices
+    except Exception:
+        return [("", _("Select a Language...")), ("en", "English (en)")]
+
+
 class RoomConfigureForm(forms.Form):
     """Per-room interpreter selection."""
 
@@ -148,6 +168,99 @@ class RoomConfigureForm(forms.Form):
         label=_("Enable interpretation for this room"),
         required=False,
     )
+    enable_transcription = forms.BooleanField(
+        label=_("Enable AI Transcription for Event Audio"),
+        required=False,
+    )
+    transcription_provider = forms.ChoiceField(
+        label=_("Transcription Provider"),
+        required=False,
+        choices=[
+            ("", _("Select a Provider...")),
+            ("local", _("Local (Faster-Whisper)")),
+            ("openai", _("OpenAI")),
+            ("deepgram", _("Deepgram")),
+            ("nvidia", _("NVIDIA")),
+            ("elevenlabs", _("ElevenLabs")),
+        ],
+    )
+    transcription_model = forms.ChoiceField(
+        label=_("Transcription Model"),
+        required=False,
+        choices=[
+            ("", _("Select a Model...")),
+            (
+                _("Local"),
+                (
+                    ("tiny", "tiny (Fastest)"),
+                    ("base", "base"),
+                ),
+            ),
+            (
+                _("OpenAI"),
+                (
+                    ("whisper-1", "whisper-1"),
+                    ("gpt-4o-realtime-preview", "gpt-4o-realtime-preview"),
+                    ("gpt-4o-mini-realtime-preview", "gpt-4o-mini-realtime-preview"),
+                ),
+            ),
+            (_("Deepgram"), (("nova-2", "nova-2"),)),
+            (
+                _("NVIDIA"),
+                (
+                    ("parakeet-rnnt", "parakeet-rnnt"),
+                    ("parakeet-ctc", "parakeet-ctc"),
+                ),
+            ),
+            (_("ElevenLabs"), (("scribe_v2_realtime", "scribe_v2_realtime"),)),
+        ],
+    )
+    source_language = forms.ChoiceField(
+        label=_("Event Language"),
+        required=False,
+        choices=[],
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    enable_translation = forms.BooleanField(
+        label=_("Enable Real-Time LLM Translation for Event Audio"),
+        required=False,
+    )
+    translation_provider = forms.ChoiceField(
+        label=_("Translation Provider"),
+        required=False,
+    )
+    translation_model = forms.ChoiceField(
+        label=_("Translation Model"),
+        required=False,
+    )
+
+    openai_api_key = forms.CharField(
+        label=_("OpenAI API Key"), required=False, widget=forms.PasswordInput(render_value=False)
+    )
+    deepgram_api_key = forms.CharField(
+        label=_("Deepgram API Key"), required=False, widget=forms.PasswordInput(render_value=False)
+    )
+    nvidia_api_key = forms.CharField(
+        label=_("NVIDIA Parakeet API Key"), required=False, widget=forms.PasswordInput(render_value=False)
+    )
+    elevenlabs_api_key = forms.CharField(
+        label=_("ElevenLabs API Key"), required=False, widget=forms.PasswordInput(render_value=False)
+    )
+    translation_openai_api_key = forms.CharField(
+        label=_("OpenAI API Key (Translation)"), required=False, widget=forms.PasswordInput(render_value=False)
+    )
+    openrouter_api_key = forms.CharField(
+        label=_("OpenRouter API Key"), required=False, widget=forms.PasswordInput(render_value=False)
+    )
+    gemini_api_key = forms.CharField(
+        label=_("Google Gemini API Key"), required=False, widget=forms.PasswordInput(render_value=False)
+    )
+    anthropic_api_key = forms.CharField(
+        label=_("Anthropic API Key"), required=False, widget=forms.PasswordInput(render_value=False)
+    )
+    groq_api_key = forms.CharField(
+        label=_("Groq API Key"), required=False, widget=forms.PasswordInput(render_value=False)
+    )
 
     def __init__(self, *args, event=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -156,9 +269,81 @@ class RoomConfigureForm(forms.Form):
 
         interpreters = list_available_interpreters(event)
         self.fields["interpreter"].choices = [(item["id"], item["label"]) for item in interpreters]
+        self.fields["source_language"].choices = get_language_choices()
+        self.fields["translation_provider"].choices = [
+            ("", _("Select a Provider...")),
+            ("local", _("Local LLM")),
+            ("openai", _("OpenAI")),
+            ("openrouter", _("OpenRouter")),
+            ("gemini", _("Google Gemini")),
+            ("anthropic", _("Anthropic")),
+            ("groq", _("Groq")),
+        ]
+        self.fields["translation_model"].choices = [
+            ("", _("Select a Model...")),
+            (_("Local"), (("nllb-200-distilled-600M", "nllb-200-distilled-600M"),)),
+            (
+                _("OpenAI"),
+                (
+                    ("gpt-4o", "gpt-4o"),
+                    ("gpt-4o-mini", "gpt-4o-mini"),
+                    ("gpt-4-turbo", "gpt-4-turbo"),
+                    ("gpt-4o-mini-realtime-preview", "gpt-4o-mini-realtime-preview"),
+                ),
+            ),
+            (
+                _("OpenRouter"),
+                (
+                    ("meta-llama/llama-3.3-70b-instruct", "meta-llama/llama-3.3-70b-instruct"),
+                    ("google/gemini-flash-1.5", "google/gemini-flash-1.5"),
+                    ("anthropic/claude-3.5-sonnet", "anthropic/claude-3.5-sonnet"),
+                ),
+            ),
+            (
+                _("Google Gemini"),
+                (
+                    ("gemini-2.5-flash", "gemini-2.5-flash"),
+                    ("gemini-2.5-pro", "gemini-2.5-pro"),
+                    ("gemini-1.5-flash", "gemini-1.5-flash"),
+                ),
+            ),
+            (
+                _("Anthropic"),
+                (
+                    ("claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20241022"),
+                    ("claude-3-5-haiku-20241022", "claude-3-5-haiku-20241022"),
+                ),
+            ),
+            (
+                _("Groq"),
+                (
+                    ("openai/gpt-oss-120b", "openai/gpt-oss-120b"),
+                    ("openai/gpt-oss-20b", "openai/gpt-oss-20b"),
+                    ("groq/compound-mini", "groq/compound-mini"),
+                ),
+            ),
+        ]
         for name, field in self.fields.items():
-            if name != "room_enabled":
+            if not isinstance(field, forms.BooleanField):
                 field.widget.attrs.setdefault("class", "form-control")
+
+        grant = None
+        if self.event:
+            from .models import VoxbentoOAuthGrant
+
+            grant = VoxbentoOAuthGrant.objects.filter(event=self.event).first()
+
+        self.configured_api_keys = {
+            "openai": bool(grant and grant.openai_api_key),
+            "deepgram": bool(grant and grant.deepgram_api_key),
+            "nvidia": bool(grant and grant.nvidia_api_key),
+            "elevenlabs": bool(grant and grant.elevenlabs_api_key),
+            "translation_openai": bool(grant and grant.translation_openai_api_key),
+            "openrouter": bool(grant and grant.openrouter_api_key),
+            "gemini": bool(grant and grant.gemini_api_key),
+            "anthropic": bool(grant and grant.anthropic_api_key),
+            "groq": bool(grant and grant.groq_api_key),
+        }
 
     def clean(self):
         cleaned_data = super().clean()
@@ -185,6 +370,39 @@ class RoomConfigureForm(forms.Form):
                     "interpreter",
                     _("Please connect to %(service)s before configuring this room.") % {"service": interpreter_label},
                 )
+
+            # Validation for AI Interpretation fields
+            enable_transcription = cleaned_data.get("enable_transcription", False)
+            if enable_transcription:
+                provider = cleaned_data.get("transcription_provider")
+                if not provider:
+                    self.add_error("transcription_provider", _("This field is required when transcription is enabled."))
+                elif provider != "local":
+                    key_map_name = provider
+                    api_key = cleaned_data.get(f"{key_map_name}_api_key")
+                    if not api_key and not self.configured_api_keys.get(key_map_name):
+                        self.add_error(f"{key_map_name}_api_key", _("API key is required for this provider."))
+
+                if not cleaned_data.get("transcription_model"):
+                    self.add_error("transcription_model", _("This field is required when transcription is enabled."))
+
+            enable_translation = cleaned_data.get("enable_translation", False)
+            if enable_translation:
+                if not enable_transcription:
+                    self.add_error(
+                        "enable_translation", _("Floor Audio Transcription must be enabled to use translation.")
+                    )
+                provider = cleaned_data.get("translation_provider")
+                if not provider:
+                    self.add_error("translation_provider", _("This field is required when translation is enabled."))
+                elif provider != "local":
+                    key_map_name = provider if provider != "openai" else "translation_openai"
+                    api_key = cleaned_data.get(f"{key_map_name}_api_key")
+                    if not api_key and not self.configured_api_keys.get(key_map_name):
+                        self.add_error(f"{key_map_name}_api_key", _("API key is required for this provider."))
+
+                if not cleaned_data.get("translation_model"):
+                    self.add_error("translation_model", _("This field is required when translation is enabled."))
 
         return cleaned_data
 

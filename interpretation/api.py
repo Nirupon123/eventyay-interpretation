@@ -223,9 +223,9 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="listener-token")
     def listener_token(self, request, room_pk=None, **kwargs):
-        self._ensure_room()
+        room = self._ensure_room()
 
-        oauth_path = f"api/v1/events/{self.event.slug}/rooms/{room_pk}/listener-token"
+        oauth_path = f"api/v1/events/{self.event.slug}/rooms/{room.pk}/listener-token"
         legacy_path = "api/v1/tokens/listener"
 
         payload = {"event_slug": self.event.slug}
@@ -241,6 +241,7 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
             token = data.get("listener_token") if is_oauth else data.get("token")
             return Response({"token": token})
         else:
+            print(f"DEBUG: VoxBento API Error: {response.text}")
             return Response({"detail": f"VoxBento API Error: {response.text}"}, status=400)
 
     @action(detail=False, methods=["get"], url_path="streams")

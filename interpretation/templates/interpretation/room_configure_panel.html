@@ -1,5 +1,5 @@
 {% load i18n %}
-<form method="post" class="interpretation-room-form" id="room-{{ entry.room.pk }}">
+<form method="post" class="interpretation-room-form" id="room-form-{{ entry.room.pk }}">
     {% csrf_token %}
     <input type="hidden" name="{{ room_id_key }}" value="{{ entry.room.pk }}">
 
@@ -26,6 +26,97 @@
                     {{ entry.configure_form.room_enabled }}
                     {{ entry.configure_form.room_enabled.label }}
                 </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="voxbento-ai-config" style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+        <h4>{% trans "Event Audio Transcription" %}</h4>
+        <div class="checkbox">
+            <label>
+                {{ entry.configure_form.enable_transcription }}
+                {{ entry.configure_form.enable_transcription.label }}
+            </label>
+        </div>
+        <div class="row transcription-fields">
+            <div class="col-md-4 form-group">
+                <label for="{{ entry.configure_form.source_language.id_for_label }}">
+                    {{ entry.configure_form.source_language.label }}
+                </label>
+                {{ entry.configure_form.source_language }}
+            </div>
+            <div class="col-md-4 form-group">
+                <label for="{{ entry.configure_form.transcription_provider.id_for_label }}">
+                    {{ entry.configure_form.transcription_provider.label }}
+                </label>
+                {{ entry.configure_form.transcription_provider }}
+            </div>
+            <div class="col-md-4 form-group">
+                <label for="{{ entry.configure_form.transcription_model.id_for_label }}">
+                    {{ entry.configure_form.transcription_model.label }}
+                </label>
+                {{ entry.configure_form.transcription_model }}
+            </div>
+        </div>
+        <div class="row api-key-container" data-purpose="transcription" style="display: none;">
+            <div class="col-md-12">
+                <div class="well well-sm" style="margin-top: 0; margin-bottom: 15px; background-color: #fcf8e3; border-color: #faebcc; color: #8a6d3b;">
+                    <div class="api-key-status" style="display: none;">
+                        <i class="fa fa-check text-success"></i> <strong>{% trans "API Key is already configured for this provider." %}</strong>
+                        <button type="button" class="btn btn-xs btn-default pull-right btn-update-key" style="background-color: #ffffff; color: #333333; border: 1px solid #cccccc; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">{% trans "Update Key" %}</button>
+                    </div>
+                    <div class="api-key-input" style="display: none;">
+                        <p style="margin-bottom: 10px;"><i class="fa fa-exclamation-triangle"></i> {% trans "This provider requires an API key." %}</p>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="password" class="form-control" placeholder="{% trans 'Enter API Key' %}" name="">
+                            <button type="button" class="btn btn-default btn-cancel-update" style="display: none;">{% trans "Cancel" %}</button>
+                            <button type="submit" name="{{ room_action_key }}" value="save" class="btn btn-primary btn-save-key-inline" style="display: none;">{% trans "Update" %}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="voxbento-ai-config" style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+        <h4>{% trans "Event Audio Translation" %}</h4>
+        <div class="checkbox">
+            <label>
+                {{ entry.configure_form.enable_translation }}
+                {{ entry.configure_form.enable_translation.label }}
+            </label>
+        </div>
+        <p class="text-muted small">{% trans "This requires Event Audio Transcription to be enabled, as translations are generated from the canonical transcript." %}</p>
+        <div class="row translation-fields">
+            <div class="col-md-6 form-group">
+                <label for="{{ entry.configure_form.translation_provider.id_for_label }}">
+                    {{ entry.configure_form.translation_provider.label }}
+                </label>
+                {{ entry.configure_form.translation_provider }}
+            </div>
+            <div class="col-md-6 form-group">
+                <label for="{{ entry.configure_form.translation_model.id_for_label }}">
+                    {{ entry.configure_form.translation_model.label }}
+                </label>
+                {{ entry.configure_form.translation_model }}
+            </div>
+        </div>
+        <div class="row api-key-container" data-purpose="translation" style="display: none;">
+            <div class="col-md-12">
+                <div class="well well-sm" style="margin-top: 0; margin-bottom: 15px; background-color: #fcf8e3; border-color: #faebcc; color: #8a6d3b;">
+                    <div class="api-key-status" style="display: none;">
+                        <i class="fa fa-check text-success"></i> <strong>{% trans "API Key is already configured for this provider." %}</strong>
+                        <button type="button" class="btn btn-xs btn-default pull-right btn-update-key" style="background-color: #ffffff; color: #333333; border: 1px solid #cccccc; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">{% trans "Update Key" %}</button>
+                    </div>
+                    <div class="api-key-input" style="display: none;">
+                        <p style="margin-bottom: 10px;"><i class="fa fa-exclamation-triangle"></i> {% trans "This provider requires an API key." %}</p>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="password" class="form-control" placeholder="{% trans 'Enter API Key' %}" name="">
+                            <button type="button" class="btn btn-default btn-cancel-update" style="display: none;">{% trans "Cancel" %}</button>
+                            <button type="submit" name="{{ room_action_key }}" value="save" class="btn btn-primary btn-save-key-inline" style="display: none;">{% trans "Update" %}</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -83,4 +174,276 @@
             </p>
         {% endif %}
     {% endif %}
+
+    <script>
+        (function() {
+            var form = document.getElementById("room-form-{{ entry.room.pk }}");
+            if (!form) return;
+
+            var interpreterSelect = form.querySelector('[name$="-interpreter"]');
+            var enableRoom = form.querySelector('[name$="-room_enabled"]');
+            var enableTranscription = form.querySelector('[name$="-enable_transcription"]');
+            var enableTranslation = form.querySelector('[name$="-enable_translation"]');
+            var aiConfigs = form.querySelectorAll('.voxbento-ai-config');
+
+            var transcriptionFields = form.querySelector('.transcription-fields');
+            var translationFields = form.querySelector('.translation-fields');
+
+            var configuredKeys = {
+                'openai': {{ entry.configure_form.configured_api_keys.openai|yesno:"true,false" }},
+                'deepgram': {{ entry.configure_form.configured_api_keys.deepgram|yesno:"true,false" }},
+                'nvidia': {{ entry.configure_form.configured_api_keys.nvidia|yesno:"true,false" }},
+                'elevenlabs': {{ entry.configure_form.configured_api_keys.elevenlabs|yesno:"true,false" }},
+                'translation_openai': {{ entry.configure_form.configured_api_keys.translation_openai|yesno:"true,false" }},
+                'openrouter': {{ entry.configure_form.configured_api_keys.openrouter|yesno:"true,false" }},
+                'gemini': {{ entry.configure_form.configured_api_keys.gemini|yesno:"true,false" }},
+                'anthropic': {{ entry.configure_form.configured_api_keys.anthropic|yesno:"true,false" }},
+                'groq': {{ entry.configure_form.configured_api_keys.groq|yesno:"true,false" }}
+            };
+
+            function updateVisibility() {
+                var isVoxbento = interpreterSelect && interpreterSelect.value === 'voxbento';
+                var isRoomEnabled = enableRoom ? enableRoom.checked : false;
+                
+                aiConfigs.forEach(function(el) {
+                    el.style.display = (isVoxbento && isRoomEnabled) ? 'block' : 'none';
+                });
+
+                if (isVoxbento) {
+                    var transOn = enableTranscription && enableTranscription.checked;
+                    var translOn = enableTranslation && enableTranslation.checked;
+
+                    // Toggle disabled states for transcription inputs
+                    if (transcriptionFields) {
+                        var tInputs = transcriptionFields.querySelectorAll('input, select');
+                        tInputs.forEach(function(inp) {
+                            inp.disabled = !transOn;
+                        });
+                    }
+
+                    // Force disable translation if transcription is off
+                    if (enableTranslation && !transOn) {
+                        enableTranslation.checked = false;
+                        enableTranslation.disabled = true;
+                        translOn = false;
+                    } else if (enableTranslation) {
+                        enableTranslation.disabled = false;
+                    }
+
+                    // Toggle disabled states for translation inputs
+                    if (translationFields) {
+                        var trInputs = translationFields.querySelectorAll('input, select');
+                        trInputs.forEach(function(inp) {
+                            inp.disabled = !translOn;
+                        });
+                    }
+
+                    if (typeof updateAPIKeys === 'function') {
+                        var transProviderSelectEl = form.querySelector('[name$="-transcription_provider"]');
+                        var translProviderSelectEl = form.querySelector('[name$="-translation_provider"]');
+                        if (transProviderSelectEl) updateAPIKeys(transProviderSelectEl, 'transcription');
+                        if (translProviderSelectEl) updateAPIKeys(translProviderSelectEl, 'translation');
+                    }
+                }
+            }
+
+            if (interpreterSelect) {
+                interpreterSelect.addEventListener('change', updateVisibility);
+            }
+            if (enableRoom) {
+                enableRoom.addEventListener('change', updateVisibility);
+            }
+            if (enableTranscription) {
+                enableTranscription.addEventListener('change', updateVisibility);
+            }
+            if (enableTranslation) {
+                enableTranslation.addEventListener('change', updateVisibility);
+            }
+
+            // Initial run
+            updateVisibility();
+
+            // Cascading dropdowns for Providers and Models
+            var transProviderSelect = form.querySelector('[name$="-transcription_provider"]');
+            var transModelSelect = form.querySelector('[name$="-transcription_model"]');
+            var masterTransModelSelect = transModelSelect ? transModelSelect.cloneNode(true) : null;
+            
+            var sourceLangSelect = form.querySelector('[name$="-source_language"]');
+            if (sourceLangSelect && typeof window.jQuery !== 'undefined' && window.jQuery.fn.select2) {
+                window.jQuery(sourceLangSelect).select2({
+                    width: '100%',
+                    theme: 'bootstrap'
+                });
+            }
+
+            var translProviderSelect = form.querySelector('[name$="-translation_provider"]');
+            var translModelSelect = form.querySelector('[name$="-translation_model"]');
+            var masterTranslModelSelect = translModelSelect ? translModelSelect.cloneNode(true) : null;
+
+            var transProviderLabelMap = {
+                'local': 'Local',
+                'openai': 'OpenAI',
+                'deepgram': 'Deepgram',
+                'nvidia': 'NVIDIA',
+                'elevenlabs': 'ElevenLabs'
+            };
+
+            var translProviderLabelMap = {
+                'local': 'Local',
+                'openai': 'OpenAI',
+                'openrouter': 'OpenRouter',
+                'gemini': 'Google Gemini',
+                'anthropic': 'Anthropic',
+                'groq': 'Groq'
+            };
+
+            function cascadeModels(providerSelect, modelSelect, masterModelSelect, labelMap) {
+                if (!providerSelect || !modelSelect || !masterModelSelect) return;
+                
+                var currentVal = modelSelect.value;
+                modelSelect.innerHTML = '';
+                
+                var defaultOpt = masterModelSelect.querySelector('option[value=""]');
+                if (defaultOpt) modelSelect.appendChild(defaultOpt.cloneNode(true));
+                
+                var providerValue = providerSelect.value;
+                if (providerValue && labelMap[providerValue]) {
+                    var groupLabel = labelMap[providerValue];
+                    var optgroup = masterModelSelect.querySelector('optgroup[label="' + groupLabel + '"]');
+                    if (optgroup) {
+                        modelSelect.appendChild(optgroup.cloneNode(true));
+                    }
+                }
+                
+                var options = Array.from(modelSelect.options);
+                var stillExists = options.some(function(opt) { return opt.value === currentVal; });
+                
+                if (stillExists && currentVal !== "") {
+                    modelSelect.value = currentVal;
+                } else {
+                    // Auto-select if there is exactly 1 valid option (plus the default empty one)
+                    if (options.length === 2 && options[0].value === "") {
+                        modelSelect.value = options[1].value;
+                    } else {
+                        modelSelect.value = "";
+                    }
+                }
+            }
+
+            if (transProviderSelect) {
+                transProviderSelect.addEventListener('change', function() {
+                    cascadeModels(transProviderSelect, transModelSelect, masterTransModelSelect, transProviderLabelMap);
+                });
+                cascadeModels(transProviderSelect, transModelSelect, masterTransModelSelect, transProviderLabelMap);
+            }
+
+            if (translProviderSelect) {
+                translProviderSelect.addEventListener('change', function() {
+                    cascadeModels(translProviderSelect, translModelSelect, masterTranslModelSelect, translProviderLabelMap);
+                    updateAPIKeys(translProviderSelect, 'translation');
+                });
+                cascadeModels(translProviderSelect, translModelSelect, masterTranslModelSelect, translProviderLabelMap);
+                updateAPIKeys(translProviderSelect, 'translation');
+            }
+
+            function updateAPIKeys(providerSelect, purpose) {
+                if (!providerSelect) return;
+                var provider = providerSelect.value;
+                var container = form.querySelector('.api-key-container[data-purpose="' + purpose + '"]');
+                if (!container) return;
+                
+                var isFeatureEnabled = false;
+                if (purpose === 'transcription' && enableTranscription) {
+                    isFeatureEnabled = enableTranscription.checked;
+                } else if (purpose === 'translation' && enableTranslation) {
+                    isFeatureEnabled = enableTranslation.checked;
+                }
+                
+                if (isFeatureEnabled && provider && provider !== 'local') {
+                    container.style.display = 'block';
+                    var statusDiv = container.querySelector('.api-key-status');
+                    var inputDiv = container.querySelector('.api-key-input');
+                    var inputField = inputDiv.querySelector('input');
+                    
+                    var keyMapName = provider;
+                    if (purpose === 'translation' && provider === 'openai') {
+                        keyMapName = 'translation_openai';
+                    }
+                    
+                    var prefix = providerSelect.name.replace(/-(?:transcription|translation)_provider$/, '-');
+                    inputField.name = prefix + keyMapName + '_api_key';
+                    
+                    var isConfigured = configuredKeys[keyMapName];
+                    var cancelButton = inputDiv.querySelector('.btn-cancel-update');
+                    var updateInlineButton = inputDiv.querySelector('.btn-save-key-inline');
+                    
+                    if (isConfigured && !inputField.dataset.wantsUpdate) {
+                        statusDiv.style.display = 'block';
+                        inputDiv.style.display = 'none';
+                        inputField.required = false;
+                    } else {
+                        statusDiv.style.display = 'none';
+                        inputDiv.style.display = 'block';
+                        inputField.required = true;
+                        if (isConfigured) {
+                            if (cancelButton) cancelButton.style.display = 'inline-block';
+                            if (updateInlineButton) updateInlineButton.style.display = 'inline-block';
+                        } else {
+                            if (cancelButton) cancelButton.style.display = 'none';
+                            if (updateInlineButton) updateInlineButton.style.display = 'none';
+                        }
+                    }
+                } else {
+                    container.style.display = 'none';
+                    var inputDiv = container.querySelector('.api-key-input');
+                    var inputField = inputDiv.querySelector('input');
+                    inputField.name = '';
+                    inputField.required = false;
+                }
+            }
+            
+            var cancelBtns = form.querySelectorAll('.btn-cancel-update');
+            cancelBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var container = btn.closest('.api-key-container');
+                    var statusDiv = container.querySelector('.api-key-status');
+                    var inputDiv = container.querySelector('.api-key-input');
+                    var inputField = inputDiv.querySelector('input');
+                    
+                    inputField.dataset.wantsUpdate = '';
+                    inputField.value = '';
+                    statusDiv.style.display = 'block';
+                    inputDiv.style.display = 'none';
+                    inputField.required = false;
+                });
+            });
+
+            var updateBtns = form.querySelectorAll('.btn-update-key');
+            updateBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var container = btn.closest('.api-key-container');
+                    var statusDiv = container.querySelector('.api-key-status');
+                    var inputDiv = container.querySelector('.api-key-input');
+                    var inputField = inputDiv.querySelector('input');
+                    var cancelBtn = inputDiv.querySelector('.btn-cancel-update');
+                    var updateInlineBtn = inputDiv.querySelector('.btn-save-key-inline');
+                    
+                    inputField.dataset.wantsUpdate = 'true';
+                    statusDiv.style.display = 'none';
+                    inputDiv.style.display = 'block';
+                    if (cancelBtn) cancelBtn.style.display = 'inline-block';
+                    if (updateInlineBtn) updateInlineBtn.style.display = 'inline-block';
+                    inputField.focus();
+                });
+            });
+
+            if (transProviderSelect) {
+                transProviderSelect.addEventListener('change', function() {
+                    updateAPIKeys(transProviderSelect, 'transcription');
+                });
+                updateAPIKeys(transProviderSelect, 'transcription');
+            }
+
+        })();
+    </script>
 </form>

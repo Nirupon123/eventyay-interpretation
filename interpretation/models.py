@@ -69,13 +69,31 @@ class RoomInterpretation(LoggedModel):
         blank=True,
         help_text=_("Languages to translate into, e.g. ['de', 'fr']."),
     )
+    enable_transcription = models.BooleanField(
+        verbose_name=_("Enable transcription"),
+        default=False,
+    )
     transcription_provider = models.CharField(
         verbose_name=_("Transcription provider"),
         max_length=50,
         blank=True,
     )
+    transcription_model = models.CharField(
+        verbose_name=_("Transcription model"),
+        max_length=50,
+        blank=True,
+    )
+    enable_translation = models.BooleanField(
+        verbose_name=_("Enable translation"),
+        default=False,
+    )
     translation_provider = models.CharField(
         verbose_name=_("Translation provider"),
+        max_length=50,
+        blank=True,
+    )
+    translation_model = models.CharField(
+        verbose_name=_("Translation model"),
         max_length=50,
         blank=True,
     )
@@ -125,6 +143,17 @@ class VoxbentoOAuthGrant(LoggedModel):
     expires_at = models.DateTimeField(null=True, blank=True)
     webhook_subscription_id = models.CharField(max_length=255, null=True, blank=True)
     webhook_secret_key = EncryptedTextField(null=True, blank=True)
+
+    openai_api_key = EncryptedTextField(null=True, blank=True)
+    deepgram_api_key = EncryptedTextField(null=True, blank=True)
+    nvidia_api_key = EncryptedTextField(null=True, blank=True)
+    elevenlabs_api_key = EncryptedTextField(null=True, blank=True)
+    translation_openai_api_key = EncryptedTextField(null=True, blank=True)
+    openrouter_api_key = EncryptedTextField(null=True, blank=True)
+    gemini_api_key = EncryptedTextField(null=True, blank=True)
+    anthropic_api_key = EncryptedTextField(null=True, blank=True)
+    groq_api_key = EncryptedTextField(null=True, blank=True)
+
     needs_reauth = models.BooleanField(default=False)
     is_disconnected = models.BooleanField(default=False)
     webhook_scope_denied = models.BooleanField(default=False)

@@ -27,7 +27,7 @@ def generate_pkce():
 class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
     permission = "can_change_event_settings"
 
-    def get(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         event = self.request.event
         client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
         if not client_id:
@@ -35,6 +35,7 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
             return redirect(reverse("plugins:interpretation:dashboard", kwargs=kwargs))
 
         redirect_uri = self.request.build_absolute_uri(reverse("plugins:interpretation:oauth_callback"))
+        redirect_uri = redirect_uri.split("?")[0]  # Strip automatically appended ?event= kwargs
 
         from .backends.voxbento_credentials import get_voxbento_base_url
 
@@ -131,6 +132,7 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
         client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
         client_secret = GlobalSettingsObject().settings.get("voxbento_client_secret", "")
         redirect_uri = self.request.build_absolute_uri(reverse("plugins:interpretation:oauth_callback"))
+        redirect_uri = redirect_uri.split("?")[0]  # Strip automatically appended ?event= kwargs
         from .backends.voxbento_credentials import get_voxbento_base_url
 
         voxbento_base = get_voxbento_base_url(event)

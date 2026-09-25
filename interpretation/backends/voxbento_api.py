@@ -6,7 +6,7 @@ from django.conf import settings
 from eventyay.base.models import Event
 
 from .voxbento_credentials import get_voxbento_base_url
-from .voxbento_oauth import get_valid_access_token
+from .voxbento_oauth import VoxbentoReauthorizationRequired, get_valid_access_token
 
 logger = logging.getLogger(__name__)
 
@@ -236,6 +236,7 @@ def sync_voxbento_room(event: Event, room_id: int, payload: dict) -> dict:
         )
         create_voxbento_event(event)
         # Retry the request
+        logger.debug("VOXBENTO_PAYLOAD_DEBUG: %s %s", api_url, payload)
         resp = requests.put(api_url, headers=headers, json=payload, timeout=5.0)
 
     if resp.status_code == 409:
@@ -248,6 +249,62 @@ def sync_voxbento_room(event: Event, room_id: int, payload: dict) -> dict:
 
     resp.raise_for_status()
     return resp.json()
+
+
+def sync_voxbento_api_keys(event: Event) -> None:
+    """
+    Syncs the event's API keys to VoxBento via PATCH /api/v1/events/{event_slug}/api_keys.
+    """
+    grant = getattr(event, "voxbento_oauth_grant", None)
+    if not grant:
+        return
+
+    base_url = get_voxbento_base_url(event)
+    if not base_url:
+        return
+
+    api_url = f"{base_url.rstrip('/')}/api/v1/events/{event.slug}/api_keys"
+    try:
+        access_token = get_valid_access_token(grant.id)
+        if not access_token:
+            raise ValueError("Cannot synchronize API keys: Requires an active OAuth connection.")
+    except VoxbentoReauthorizationRequired:
+        raise
+    except requests.RequestException as e:
+        raise ValueError(f"Cannot synchronize API keys: Network error ({e})")
+
+    payload = {
+        "openai_api_key": grant.openai_api_key,
+        "deepgram_api_key": grant.deepgram_api_key,
+        "nvidia_api_key": grant.nvidia_api_key,
+        "elevenlabs_api_key": grant.elevenlabs_api_key,
+        "translation_openai_api_key": grant.translation_openai_api_key,
+        "openrouter_api_key": grant.openrouter_api_key,
+        "gemini_api_key": grant.gemini_api_key,
+        "anthropic_api_key": grant.anthropic_api_key,
+        "groq_api_key": grant.groq_api_key,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        resp = requests.patch(api_url, headers=headers, json=payload, timeout=5.0)
+
+        if resp.status_code == 404:
+            logger.warning(
+                "VoxBento returned 404 Not Found for API keys sync on event %s. Attempting to provision event.",
+                event.id,
+            )
+            create_voxbento_event(event)
+            resp = requests.patch(api_url, headers=headers, json=payload, timeout=5.0)
+
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        logger.error("Failed to sync API keys to VoxBento for event %s: %s", event.id, e)
+        raise ValueError(f"Failed to synchronize API keys with VoxBento: {e}")
 
 
 def delete_voxbento_room(event: Event, room_id: int) -> None:
