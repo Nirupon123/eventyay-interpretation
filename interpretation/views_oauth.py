@@ -96,11 +96,23 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
         )
 
         error = request.GET.get("error")
+        error_description = request.GET.get("error_description", "")
         if error:
             if error == "access_denied":
                 messages.error(request, _("VoxBento connection was cancelled."))
+            elif "403" in error_description or error == "unauthorized_client":
+                messages.error(
+                    request,
+                    _(
+                        "OAuth authorization failed: You do not have permission. "
+                        "Ensure you are a team co-owner in VoxBento or that your team settings allow this."
+                    ),
+                )
             else:
-                messages.error(request, _("OAuth authorization failed: ") + error)
+                msg = _("OAuth authorization failed: ") + error
+                if error_description:
+                    msg += f" ({error_description})"
+                messages.error(request, msg)
             return redirect(dashboard_url)
 
         session_data = request.session.pop(f"voxbento_oauth_state:{event.slug}", None)
@@ -140,7 +152,15 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             messages.error(request, _("VoxBento Base URL is not configured."))
             return redirect(dashboard_url)
 
+        import logging
+
         import requests
+
+        logger = logging.getLogger(__name__)
+
+        existing_grant = VoxbentoOAuthGrant.objects.filter(event=event).first()
+        old_access_token = existing_grant.access_token if existing_grant else None
+        old_webhook_id = existing_grant.webhook_subscription_id if existing_grant else None
 
         try:
             resp = requests.post(
@@ -153,36 +173,57 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
                     "redirect_uri": redirect_uri,
                     "code_verifier": code_verifier,
                 },
-                timeout=5.0,
+                timeout=(3.0, 5.0),
             )
             resp.raise_for_status()
             data = resp.json()
 
             from datetime import timedelta
 
+            from django.db import IntegrityError, transaction
             from django.utils import timezone
 
             expires_in = data.get("expires_in", 3600)
             expires_at = timezone.now() + timedelta(seconds=expires_in)
 
-            VoxbentoOAuthGrant.objects.update_or_create(
-                event=event,
-                defaults={
-                    "access_token": data.get("access_token", ""),
-                    "refresh_token": data.get("refresh_token", ""),
-                    "scopes": data.get("scope", ""),
-                    "expires_at": expires_at,
-                    "needs_reauth": False,
-                    "is_disconnected": False,
-                },
-            )
-            from django.db import transaction
+            defaults = {
+                "access_token": data.get("access_token", ""),
+                "refresh_token": data.get("refresh_token", ""),
+                "scopes": data.get("scope", ""),
+                "expires_at": expires_at,
+                "needs_reauth": False,
+                "is_disconnected": False,
+                "webhook_subscription_id": None,
+                "webhook_secret_key": None,
+            }
+
+            try:
+                with transaction.atomic():
+                    grant, created = VoxbentoOAuthGrant.objects.update_or_create(
+                        event=event,
+                        defaults=defaults,
+                    )
+            except IntegrityError:
+                with transaction.atomic():
+                    grant = VoxbentoOAuthGrant.objects.select_for_update().get(event=event)
+                    for k, v in defaults.items():
+                        setattr(grant, k, v)
+                    grant.save()
 
             from .tasks import sync_voxbento_connection
 
             transaction.on_commit(lambda: sync_voxbento_connection.delay(event.id))
 
             messages.success(request, _("Successfully connected to VoxBento!"))
+
+            if old_webhook_id and old_access_token:
+                try:
+                    headers = {"Authorization": f"Bearer {old_access_token}"}
+                    delete_url = f"{voxbento_base.rstrip('/')}/api/v1/webhooks/{old_webhook_id}"
+                    requests.delete(delete_url, headers=headers, timeout=(3.0, 5.0))
+                except requests.exceptions.RequestException as e:
+                    logger.warning(f"Failed to delete old webhook during reconnect for event {event.slug}: {e}")
+
         except Exception as e:
             messages.error(request, _("Failed to exchange OAuth token: ") + str(e))
 
