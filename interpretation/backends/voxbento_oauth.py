@@ -99,9 +99,22 @@ def get_valid_access_token(grant_id):
             try:
                 new_tokens = call_voxbento_refresh(grant.refresh_token, base_url)
 
-                # Fetch again before saving to check if it was disconnected while the network call was in flight
-                grant.refresh_from_db()
-                if grant.is_disconnected:
+                # Atomic token update to prevent re-connecting a disconnected grant
+                expires_in = new_tokens.get("expires_in", 3600)
+                expires_at = timezone.now() + timedelta(seconds=expires_in)
+
+                updated = (
+                    type(grant)
+                    .objects.filter(id=grant.id, is_disconnected=False)
+                    .update(
+                        access_token=new_tokens["access_token"],
+                        refresh_token=new_tokens["refresh_token"],
+                        expires_at=expires_at,
+                        needs_reauth=False,
+                    )
+                )
+
+                if updated == 0:
                     # Best-effort revoke the newly issued token since we aren't saving it
                     try:
                         from eventyay.base.settings import GlobalSettingsObject
@@ -109,7 +122,7 @@ def get_valid_access_token(grant_id):
                         client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
                         client_secret = GlobalSettingsObject().settings.get("voxbento_client_secret", "")
                         if client_id:
-                            requests.post(
+                            response = requests.post(
                                 f"{base_url.rstrip('/')}/oauth/revoke",
                                 data={
                                     "token": new_tokens["access_token"],
@@ -118,16 +131,20 @@ def get_valid_access_token(grant_id):
                                 },
                                 timeout=(3.0, 5.0),
                             )
+                            if not response.ok:
+                                import logging
+
+                                logging.getLogger(__name__).warning(
+                                    "VoxBento returned %s while revoking token after disconnect", response.status_code
+                                )
                     except Exception:
                         pass
                     raise VoxbentoReauthorizationRequired("Integration disconnected during refresh network call")
 
                 grant.access_token = new_tokens["access_token"]
                 grant.refresh_token = new_tokens["refresh_token"]
-                expires_in = new_tokens.get("expires_in", 3600)
-                grant.expires_at = timezone.now() + timedelta(seconds=expires_in)
+                grant.expires_at = expires_at
                 grant.needs_reauth = False
-                grant.save(update_fields=["access_token", "refresh_token", "expires_at", "needs_reauth"])
 
                 return grant.access_token
 

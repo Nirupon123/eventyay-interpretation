@@ -82,57 +82,62 @@ def clear_voxbento_credentials(event: Event) -> None:
         logger = logging.getLogger(__name__)
         base_url = get_voxbento_base_url(event)
 
-        # Best effort revoke and webhook delete
-        if base_url:
-            try:
-                # Attempt remote webhook deletion
-                if grant.webhook_subscription_id:
-                    from .voxbento_oauth import (
-                        get_valid_access_token,
-                    )
-
-                    api_url = f"{base_url.rstrip('/')}/api/v1/webhooks"
-                    access_token = get_valid_access_token(grant.id)
-                    if access_token:
-                        headers = {"Authorization": f"Bearer {access_token}"}
-                        delete_url = f"{api_url}/{grant.webhook_subscription_id}"
-                        resp = requests.delete(delete_url, headers=headers, timeout=(3.0, 5.0))
-                        if resp.status_code not in (204, 404):
-                            resp.raise_for_status()
-            except Exception as e:
-                logger.error(
-                    "Failed to delete VoxBento webhook subscription %s for event %s: %s",
-                    grant.webhook_subscription_id,
-                    event.id,
-                    str(e),
-                )
-
-            try:
-                # Attempt remote oauth revocation
-                from eventyay.base.settings import GlobalSettingsObject
-
-                client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
-                client_secret = GlobalSettingsObject().settings.get("voxbento_client_secret", "")
-                if client_id and grant.access_token:
-                    revoke_url = f"{base_url.rstrip('/')}/oauth/revoke"
-                    resp = requests.post(
-                        revoke_url,
-                        data={"token": grant.access_token, "client_id": client_id, "client_secret": client_secret},
-                        timeout=(3.0, 5.0),
-                    )
-                    resp.raise_for_status()
-            except Exception as e:
-                logger.error(
-                    "Failed to revoke VoxBento OAuth token for event %s: %s", event.id, str(e), extra={"notify": True}
-                )
-
-        # Local kill switch with mutual exclusion
         lock_key = f"voxbento:refresh:{grant.id}"
         import redis.exceptions
 
         try:
             with _get_cache_lock(lock_key, timeout=10, blocking_timeout=12):
                 grant.refresh_from_db()
+
+                # Best effort revoke and webhook delete
+                if base_url:
+                    try:
+                        # Attempt remote webhook deletion
+                        if grant.webhook_subscription_id:
+                            from .voxbento_oauth import get_valid_access_token
+
+                            api_url = f"{base_url.rstrip('/')}/api/v1/webhooks"
+                            access_token = get_valid_access_token(grant.id)
+                            if access_token:
+                                headers = {"Authorization": f"Bearer {access_token}"}
+                                delete_url = f"{api_url}/{grant.webhook_subscription_id}"
+                                resp = requests.delete(delete_url, headers=headers, timeout=(3.0, 5.0))
+                                if resp.status_code not in (204, 404):
+                                    resp.raise_for_status()
+                    except Exception as e:
+                        logger.error(
+                            "Failed to delete VoxBento webhook subscription %s for event %s: %s",
+                            grant.webhook_subscription_id,
+                            event.id,
+                            str(e),
+                        )
+
+                    try:
+                        # Attempt remote oauth revocation
+                        from eventyay.base.settings import GlobalSettingsObject
+
+                        client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
+                        client_secret = GlobalSettingsObject().settings.get("voxbento_client_secret", "")
+                        if client_id and grant.access_token:
+                            revoke_url = f"{base_url.rstrip('/')}/oauth/revoke"
+                            resp = requests.post(
+                                revoke_url,
+                                data={
+                                    "token": grant.access_token,
+                                    "client_id": client_id,
+                                    "client_secret": client_secret,
+                                },
+                                timeout=(3.0, 5.0),
+                            )
+                            resp.raise_for_status()
+                    except Exception as e:
+                        logger.error(
+                            "Failed to revoke VoxBento OAuth token for event %s: %s",
+                            event.id,
+                            str(e),
+                            extra={"notify": True},
+                        )
+
                 grant.access_token = ""
                 grant.refresh_token = ""
                 grant.is_disconnected = True

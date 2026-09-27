@@ -198,11 +198,24 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             }
 
             try:
-                with transaction.atomic():
-                    grant, created = VoxbentoOAuthGrant.objects.update_or_create(
-                        event=event,
-                        defaults=defaults,
-                    )
+                import redis.exceptions
+
+                from interpretation.backends.voxbento_oauth import _get_cache_lock
+
+                existing_grant = VoxbentoOAuthGrant.objects.filter(event=event).first()
+                lock_key = (
+                    f"voxbento:refresh:{existing_grant.id}" if existing_grant else f"voxbento:refresh:new:{event.id}"
+                )
+                try:
+                    with _get_cache_lock(lock_key, timeout=10, blocking_timeout=12):
+                        with transaction.atomic():
+                            grant, created = VoxbentoOAuthGrant.objects.update_or_create(
+                                event=event,
+                                defaults=defaults,
+                            )
+                except redis.exceptions.LockError:
+                    messages.error(request, _("The integration is currently syncing. Please try again."))
+                    return redirect(dashboard_url)
             except IntegrityError:
                 with transaction.atomic():
                     grant = VoxbentoOAuthGrant.objects.select_for_update().get(event=event)
@@ -220,7 +233,11 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
                 try:
                     headers = {"Authorization": f"Bearer {old_access_token}"}
                     delete_url = f"{voxbento_base.rstrip('/')}/api/v1/webhooks/{old_webhook_id}"
-                    requests.delete(delete_url, headers=headers, timeout=(3.0, 5.0))
+                    resp = requests.delete(delete_url, headers=headers, timeout=(3.0, 5.0))
+                    if resp.status_code not in (204, 404):
+                        logger.warning(
+                            f"Failed to delete old webhook during reconnect for event {event.slug}: {resp.status_code}"
+                        )
                 except requests.exceptions.RequestException as e:
                     logger.warning(f"Failed to delete old webhook during reconnect for event {event.slug}: {e}")
 
