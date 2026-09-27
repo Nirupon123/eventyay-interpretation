@@ -94,10 +94,8 @@ def clear_voxbento_credentials(event: Event) -> None:
                     try:
                         # Attempt remote webhook deletion
                         if grant.webhook_subscription_id:
-                            from .voxbento_oauth import get_valid_access_token
-
                             api_url = f"{base_url.rstrip('/')}/api/v1/webhooks"
-                            access_token = get_valid_access_token(grant.id)
+                            access_token = grant.access_token
                             if access_token:
                                 headers = {"Authorization": f"Bearer {access_token}"}
                                 delete_url = f"{api_url}/{grant.webhook_subscription_id}"
