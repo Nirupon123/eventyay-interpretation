@@ -122,7 +122,15 @@ class VoxbentoWebhookReceiverView(View):
             interp = RoomInterpretation.objects.select_for_update().get(id=room.interpretation.id)
         interp.status = interp.STATUS_RUNNING
         interp.backend_session_id = data.get("session_id", "")
-        interp.save(update_fields=["status", "backend_session_id"])
+
+        if interp.backend_config and "last_error" in interp.backend_config:
+            config = dict(interp.backend_config)
+            config.pop("last_error", None)
+            config.pop("last_error_code", None)
+            interp.backend_config = config
+            interp.save(update_fields=["status", "backend_session_id", "backend_config"])
+        else:
+            interp.save(update_fields=["status", "backend_session_id"])
 
         from .video_integration import notify_video_room_config_changed
 

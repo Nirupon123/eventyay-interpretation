@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -325,12 +326,19 @@ class InterpretationRoomSettings(
 
                 grant = VoxbentoOAuthGrant.objects.filter(event=event).first()
                 if grant:
+                    from .api_key_validator import validate_provider_key
+
                     for key in api_keys:
                         val = form.cleaned_data.get(key)
                         if val:
+                            provider = key.replace("_api_key", "")
+                            if not validate_provider_key(provider, val):
+                                if "translation" in key:
+                                    provider_name = f"{provider.replace('translation_', '').capitalize()} (Translation)"
+                                else:
+                                    provider_name = provider.capitalize()
+                                return None, f"The API key for {provider_name} is invalid, expired, or revoked."
                             setattr(grant, key, val)
-
-                    from .api_key_validator import validate_provider_key
 
                     tp = form.cleaned_data.get("transcription_provider")
                     if form.cleaned_data.get("enable_transcription") and tp and tp != "none":
@@ -346,6 +354,7 @@ class InterpretationRoomSettings(
                             return None, f"The API key for {vp} (Translation) is invalid, expired, or revoked."
 >>>>>>> 37fde0a (fixed with the reviews)
 
+            # Validation passed, safe to update room interpretation
             with transaction.atomic():
                 # Handle API Keys first inside transaction
                 api_keys = [
@@ -531,12 +540,13 @@ class InterpretationRoomSettings(
                         invalid_api_keys[tp] = True
 
                 vp = data.get("translation_provider")
-                if not api_key_error and data.get("enable_translation") and vp and vp not in ("none", "local"):
+                if data.get("enable_translation") and vp and vp not in ("none", "local"):
                     key_name = "translation_openai_api_key" if vp == "openai" else f"{vp}_api_key"
                     dict_key = "translation_openai" if vp == "openai" else vp
                     key_val = getattr(grant, key_name, None)
                     if key_val and not validate_provider_key(vp, key_val):
-                        api_key_error = f"The API key for {vp.capitalize()} (Translation) is invalid, expired, or revoked."
+                        if not api_key_error:
+                            api_key_error = f"The API key for {vp.capitalize()} (Translation) is invalid, expired, or revoked."
                         invalid_api_keys[dict_key] = True
 
             rooms.append(
