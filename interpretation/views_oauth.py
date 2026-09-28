@@ -158,9 +158,8 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
 
         logger = logging.getLogger(__name__)
 
-        existing_grant = VoxbentoOAuthGrant.objects.filter(event=event).first()
-        old_access_token = existing_grant.access_token if existing_grant else None
-        old_webhook_id = existing_grant.webhook_subscription_id if existing_grant else None
+        old_access_token = None
+        old_webhook_id = None
 
         try:
             resp = requests.post(
@@ -209,6 +208,9 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
                 try:
                     with _get_cache_lock(lock_key, timeout=10, blocking_timeout=12):
                         with transaction.atomic():
+                            existing_grant = VoxbentoOAuthGrant.objects.select_for_update().filter(event=event).first()
+                            old_access_token = existing_grant.access_token if existing_grant else None
+                            old_webhook_id = existing_grant.webhook_subscription_id if existing_grant else None
                             grant, created = VoxbentoOAuthGrant.objects.update_or_create(
                                 event=event,
                                 defaults=defaults,
@@ -219,6 +221,8 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             except IntegrityError:
                 with transaction.atomic():
                     grant = VoxbentoOAuthGrant.objects.select_for_update().get(event=event)
+                    old_access_token = grant.access_token
+                    old_webhook_id = grant.webhook_subscription_id
                     for k, v in defaults.items():
                         setattr(grant, k, v)
                     grant.save()
