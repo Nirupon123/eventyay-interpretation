@@ -116,10 +116,10 @@ class VoxbentoWebhookReceiverView(View):
 
         from django.db import transaction
 
-        from interpretation.models import RoomInterpreter
+        from interpretation.models import RoomInterpretation
 
         with transaction.atomic():
-            interp = RoomInterpreter.objects.select_for_update().get(id=room.interpretation.id)
+            interp = RoomInterpretation.objects.select_for_update().get(id=room.interpretation.id)
         interp.status = interp.STATUS_RUNNING
         interp.backend_session_id = data.get("session_id", "")
         interp.save(update_fields=["status", "backend_session_id"])
@@ -135,10 +135,10 @@ class VoxbentoWebhookReceiverView(View):
 
         from django.db import transaction
 
-        from interpretation.models import RoomInterpreter
+        from interpretation.models import RoomInterpretation
 
         with transaction.atomic():
-            interp = RoomInterpreter.objects.select_for_update().get(id=room.interpretation.id)
+            interp = RoomInterpretation.objects.select_for_update().get(id=room.interpretation.id)
         interp.status = interp.STATUS_IDLE
         interp.backend_session_id = ""
 
@@ -173,10 +173,10 @@ class VoxbentoWebhookReceiverView(View):
 
         from django.db import transaction
 
-        from interpretation.models import RoomInterpreter
+        from interpretation.models import RoomInterpretation
 
         with transaction.atomic():
-            interp = RoomInterpreter.objects.select_for_update().get(id=room.interpretation.id)
+            interp = RoomInterpretation.objects.select_for_update().get(id=room.interpretation.id)
         config = interp.backend_config
         active = config.get("active_interpreters", [])
 

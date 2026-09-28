@@ -62,6 +62,7 @@ def save_voxbento_credentials(event: Event, base_url: str, api_key: str) -> None
 
 
 def clear_voxbento_credentials(event: Event) -> None:
+    base_url = get_voxbento_base_url(event)
     for key in EVENT_SETTINGS_KEYS:
         event.settings.delete(key)
 
@@ -80,7 +81,6 @@ def clear_voxbento_credentials(event: Event) -> None:
         from .voxbento_oauth import _get_cache_lock
 
         logger = logging.getLogger(__name__)
-        base_url = get_voxbento_base_url(event)
 
         lock_key = f"voxbento:refresh:{grant.id}"
         import redis.exceptions
