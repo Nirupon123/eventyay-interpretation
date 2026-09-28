@@ -73,7 +73,9 @@
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <div style="position: relative; flex-grow: 1;">
                                 <input type="password" class="form-control" placeholder="{% trans 'Enter API Key' %}" name="" style="padding-right: 30px;">
-                                <i class="fa fa-eye toggle-password" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999;" title="{% trans 'Show API Key' %}"></i>
+                                <button type="button" class="btn btn-link toggle-password" style="position: absolute; right: 0; top: 0; bottom: 0; padding: 0 10px; color: #999; border: none; background: transparent;" title="{% trans 'Show API Key' %}">
+                                    <i class="fa fa-eye"></i>
+                                </button>
                             </div>
                             <button type="button" class="btn btn-default btn-cancel-update" style="display: none;">{% trans "Cancel" %}</button>
                             <button type="submit" name="{{ room_action_key }}" value="save" class="btn btn-primary btn-save-key-inline" style="display: none;">{% trans "Update" %}</button>
@@ -119,7 +121,9 @@
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <div style="position: relative; flex-grow: 1;">
                                 <input type="password" class="form-control" placeholder="{% trans 'Enter API Key' %}" name="" style="padding-right: 30px;">
-                                <i class="fa fa-eye toggle-password" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999;" title="{% trans 'Show API Key' %}"></i>
+                                <button type="button" class="btn btn-link toggle-password" style="position: absolute; right: 0; top: 0; bottom: 0; padding: 0 10px; color: #999; border: none; background: transparent;" title="{% trans 'Show API Key' %}">
+                                    <i class="fa fa-eye"></i>
+                                </button>
                             </div>
                             <button type="button" class="btn btn-default btn-cancel-update" style="display: none;">{% trans "Cancel" %}</button>
                             <button type="submit" name="{{ room_action_key }}" value="save" class="btn btn-primary btn-save-key-inline" style="display: none;">{% trans "Update" %}</button>
