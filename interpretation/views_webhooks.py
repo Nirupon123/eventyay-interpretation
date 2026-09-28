@@ -122,8 +122,9 @@ class VoxbentoWebhookReceiverView(View):
             interp = RoomInterpretation.objects.select_for_update().get(id=room.interpretation.id)
         interp.status = interp.STATUS_RUNNING
         interp.backend_session_id = data.get("session_id", "")
-
-        if interp.backend_config and "last_error" in interp.backend_config:
+        if interp.backend_config and (
+            "last_error" in interp.backend_config or "last_error_code" in interp.backend_config
+        ):
             config = dict(interp.backend_config)
             config.pop("last_error", None)
             config.pop("last_error_code", None)
@@ -161,7 +162,9 @@ class VoxbentoWebhookReceiverView(View):
             interp.save(update_fields=["status", "backend_session_id", "backend_config"])
         else:
             # Clear previous errors on normal shutdown
-            if interp.backend_config and "last_error" in interp.backend_config:
+            if interp.backend_config and (
+                "last_error" in interp.backend_config or "last_error_code" in interp.backend_config
+            ):
                 config = dict(interp.backend_config)
                 config.pop("last_error", None)
                 config.pop("last_error_code", None)
