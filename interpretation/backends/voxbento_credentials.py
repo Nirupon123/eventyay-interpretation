@@ -62,7 +62,10 @@ def save_voxbento_credentials(event: Event, base_url: str, api_key: str) -> None
 
 
 def clear_voxbento_credentials(event: Event) -> None:
-    base_url = get_voxbento_base_url(event)
+    try:
+        base_url = get_voxbento_base_url(event)
+    except VoxbentoError:
+        base_url = ""
     for key in EVENT_SETTINGS_KEYS:
         event.settings.delete(key)
 
@@ -126,6 +129,7 @@ def clear_voxbento_credentials(event: Event) -> None:
                                     "client_secret": client_secret,
                                 },
                                 timeout=(3.0, 5.0),
+                                allow_redirects=False,
                             )
                             resp.raise_for_status()
                     except Exception as e:
