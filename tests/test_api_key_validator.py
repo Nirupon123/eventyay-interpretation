@@ -66,3 +66,15 @@ def test_validate_provider_key_500_transient_error():
 
 def test_validate_provider_key_empty():
     assert validate_provider_key("openai", "") is False
+
+
+@responses.activate
+def test_validate_provider_key_404_inconclusive():
+    responses.add(
+        responses.GET,
+        "https://api.openai.com/v1/models",
+        body="Not Found",
+        status=404,
+    )
+    with pytest.raises(APIKeyNetworkError):
+        validate_provider_key("openai", "sk-inconclusive-key")

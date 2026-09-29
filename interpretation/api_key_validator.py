@@ -89,8 +89,8 @@ def validate_provider_key(provider: str, api_key: str) -> bool:
             # Transient failures (rate limits, server errors)
             if resp.status_code == 429 or resp.status_code >= 500:
                 raise APIKeyNetworkError(f"Provider {provider} returned {resp.status_code}")
-            # For 404s or other unexpected client errors, assume invalid endpoint/config
-            return False
+            # For 404s or other unexpected client errors, treat the validation request itself as inconclusive
+            raise APIKeyNetworkError(f"Unexpected provider response: {resp.status_code}")
 
     except requests.RequestException as e:
         logger.warning(f"Failed to reach {provider} API for key validation: {e}")
