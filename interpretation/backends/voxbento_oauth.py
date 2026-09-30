@@ -12,13 +12,13 @@ from .voxbento_credentials import get_voxbento_base_url
 logger = logging.getLogger(__name__)
 
 
-class VoxbentoTemporarilyUnavailable(requests.RequestException):
+class VoxbentoTemporarilyUnavailable(Exception):
     """Raised when VoxBento API or locking is temporarily unavailable."""
 
     pass
 
 
-class VoxbentoReauthorizationRequired(requests.RequestException):
+class VoxbentoReauthorizationRequired(Exception):
     """Raised when the OAuth token is invalid/revoked and user must re-authenticate."""
 
     pass
