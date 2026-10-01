@@ -245,8 +245,8 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
             token = data.get("listener_token") if is_oauth else data.get("token")
             return Response({"token": token})
         else:
-            logger.warning("VoxBento API Error (%s): %s", response.status_code, response.text)
-            return Response({"detail": f"VoxBento API Error: {response.text}"}, status=400)
+            logger.warning("VoxBento API Error (%s) when fetching listener token.", response.status_code)
+            return Response({"detail": "Failed to retrieve listener token from VoxBento."}, status=400)
 
     @action(detail=False, methods=["get"], url_path="streams")
     def streams(self, request, room_pk=None, **kwargs):
