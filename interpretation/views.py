@@ -304,6 +304,7 @@ class InterpretationRoomSettings(
         try:
             from django.db import transaction
 
+            sync_needed = False
             with transaction.atomic():
                 interpretation = update_room_interpretation(
                     room,
@@ -348,9 +349,12 @@ class InterpretationRoomSettings(
 
                         if updated_keys:
                             grant.save(update_fields=api_keys)
-                            from .backends.voxbento_api import sync_voxbento_api_keys
+                            sync_needed = True
 
-                            sync_voxbento_api_keys(event)
+            if sync_needed:
+                from .backends.voxbento_api import sync_voxbento_api_keys
+
+                sync_voxbento_api_keys(event)
 
         except ValueError as exc:
             return None, str(exc)
