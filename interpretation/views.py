@@ -340,16 +340,13 @@ class InterpretationRoomSettings(
 
                     grant = VoxbentoOAuthGrant.objects.filter(event=event).first()
                     if grant:
-                        updated_keys = False
                         for key in api_keys:
                             val = form.cleaned_data.get(key)
                             if val:
                                 setattr(grant, key, val)
-                                updated_keys = True
 
-                        if updated_keys:
-                            grant.save(update_fields=api_keys)
-                            sync_needed = True
+                        grant.save(update_fields=api_keys)
+                        sync_needed = True
 
             if sync_needed:
                 from .backends.voxbento_api import sync_voxbento_api_keys
