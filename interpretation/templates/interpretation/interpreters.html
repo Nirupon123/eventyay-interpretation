@@ -47,42 +47,48 @@
                                     </div>
                                 {% endif %}
                             </div>
-                            <form method="post" class="interpretation-interpreter-actions" id="deleteVoxBentoForm_{{ entry.id }}">
-                                {% csrf_token %}
-                                <input type="hidden" name="interpretation_interpreter_id" value="{{ entry.id }}">
+                            <div class="interpretation-account-actions">
                                 {% if entry.is_disconnected and entry.id == "voxbento" %}
-                                    <a href="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}" class="btn btn-primary btn-sm" style="margin-right: 10px;">
-                                        <i class="fa fa-plug"></i> {% trans "Reconnect" %}
-                                    </a>
-                                {% else %}
-                                    <button type="submit"
-                                            name="interpretation_interpreter_action"
-                                            value="test"
-                                            class="btn btn-default btn-sm">
-                                        {% trans "Test connection" %}
-                                    </button>
-                                    <button type="submit"
-                                            name="interpretation_interpreter_action"
-                                            value="disconnect"
-                                            class="btn btn-link btn-sm">
-                                        {% trans "Disconnect" %}
-                                    </button>
+                                    <form method="post" action="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}" class="m-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            <i class="fa fa-plug"></i> {% trans "Reconnect" %}
+                                        </button>
+                                    </form>
                                 {% endif %}
-                                {% if entry.id == "voxbento" %}
-                                <button type="submit"
-                                        id="hiddenDeleteSubmitBtn"
-                                        name="interpretation_interpreter_action"
-                                        value="delete_event"
-                                        style="display: none;">
-                                </button>
-                                <button type="button"
-                                        class="btn btn-danger btn-sm pull-right"
-                                        data-toggle="modal"
-                                        data-target="#deleteVoxBentoEventModal">
-                                    <i class="fa fa-trash"></i> {% trans "Delete Event" %}
-                                </button>
-                                {% endif %}
-                            </form>
+                                <form method="post" id="deleteVoxBentoForm_{{ entry.id }}" class="m-0">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="interpretation_interpreter_id" value="{{ entry.id }}">
+                                    {% if not entry.is_disconnected or entry.id != "voxbento" %}
+                                        <button type="submit"
+                                                name="interpretation_interpreter_action"
+                                                value="test"
+                                                class="btn btn-default btn-sm">
+                                            {% trans "Test connection" %}
+                                        </button>
+                                        <button type="submit"
+                                                name="interpretation_interpreter_action"
+                                                value="disconnect"
+                                                class="btn btn-link btn-sm">
+                                            {% trans "Disconnect" %}
+                                        </button>
+                                    {% endif %}
+                                    {% if entry.id == "voxbento" %}
+                                    <button type="submit"
+                                            id="hiddenDeleteSubmitBtn"
+                                            name="interpretation_interpreter_action"
+                                            value="delete_event"
+                                            style="display: none;">
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-danger btn-sm"
+                                            data-toggle="modal"
+                                            data-target="#deleteVoxBentoEventModal">
+                                        <i class="fa fa-trash"></i> {% trans "Delete Event" %}
+                                    </button>
+                                    {% endif %}
+                                </form>
+                            </div>
                         </div>
                     {% else %}
                     {% if entry.id == "voxbento" %}
@@ -90,9 +96,12 @@
                             <p>
                                 {% trans "VoxBento is configured globally by the system administrator. Connect your event to VoxBento using OAuth." %}
                             </p>
-                            <a href="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}" class="btn btn-primary">
-                                <i class="fa fa-plug"></i> {% trans "Connect with VoxBento" %}
-                            </a>
+                            <form method="post" action="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-plug"></i> {% trans "Connect with VoxBento" %}
+                                </button>
+                            </form>
                         </div>
                     {% else %}
                         <form method="post" class="interpretation-interpreter-connect-form">
