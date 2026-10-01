@@ -1,6 +1,8 @@
 document.addEventListener("DOMContentLoaded", function() {
     var forms = document.querySelectorAll(".interpretation-room-form");
     forms.forEach(function(form) {
+        if (form.dataset.initialized) return;
+        form.dataset.initialized = "true";
         initRoomConfigureForm(form);
     });
 
@@ -103,24 +105,24 @@ document.addEventListener("DOMContentLoaded", function() {
         var translModelSelect = form.querySelector('[name$="-translation_model"]');
         var masterTranslModelSelect = translModelSelect ? translModelSelect.cloneNode(true) : null;
 
-        var transProviderLabelMap = {
-            'local': 'Local',
-            'openai': 'OpenAI',
-            'deepgram': 'Deepgram',
-            'nvidia': 'NVIDIA',
-            'elevenlabs': 'ElevenLabs'
+        var transProviderIndexMap = {
+            'local': 0,
+            'openai': 1,
+            'deepgram': 2,
+            'nvidia': 3,
+            'elevenlabs': 4
         };
 
-        var translProviderLabelMap = {
-            'local': 'Local',
-            'openai': 'OpenAI',
-            'openrouter': 'OpenRouter',
-            'gemini': 'Google Gemini',
-            'anthropic': 'Anthropic',
-            'groq': 'Groq'
+        var translProviderIndexMap = {
+            'local': 0,
+            'openai': 1,
+            'openrouter': 2,
+            'gemini': 3,
+            'anthropic': 4,
+            'groq': 5
         };
 
-        function cascadeModels(providerSelect, modelSelect, masterModelSelect, labelMap) {
+        function cascadeModels(providerSelect, modelSelect, masterModelSelect, indexMap) {
             if (!providerSelect || !modelSelect || !masterModelSelect) return;
             
             var currentVal = modelSelect.value;
@@ -130,9 +132,10 @@ document.addEventListener("DOMContentLoaded", function() {
             if (defaultOpt) modelSelect.appendChild(defaultOpt.cloneNode(true));
             
             var providerValue = providerSelect.value;
-            if (providerValue && labelMap[providerValue]) {
-                var groupLabel = labelMap[providerValue];
-                var optgroup = masterModelSelect.querySelector('optgroup[label="' + groupLabel + '"]');
+            if (providerValue && indexMap[providerValue] !== undefined) {
+                var groupIndex = indexMap[providerValue];
+                var optgroups = masterModelSelect.querySelectorAll('optgroup');
+                var optgroup = optgroups[groupIndex];
                 if (optgroup) {
                     modelSelect.appendChild(optgroup.cloneNode(true));
                 }
@@ -155,17 +158,17 @@ document.addEventListener("DOMContentLoaded", function() {
 
         if (transProviderSelect) {
             transProviderSelect.addEventListener('change', function() {
-                cascadeModels(transProviderSelect, transModelSelect, masterTransModelSelect, transProviderLabelMap);
+                cascadeModels(transProviderSelect, transModelSelect, masterTransModelSelect, transProviderIndexMap);
             });
-            cascadeModels(transProviderSelect, transModelSelect, masterTransModelSelect, transProviderLabelMap);
+            cascadeModels(transProviderSelect, transModelSelect, masterTransModelSelect, transProviderIndexMap);
         }
 
         if (translProviderSelect) {
             translProviderSelect.addEventListener('change', function() {
-                cascadeModels(translProviderSelect, translModelSelect, masterTranslModelSelect, translProviderLabelMap);
+                cascadeModels(translProviderSelect, translModelSelect, masterTranslModelSelect, translProviderIndexMap);
                 updateAPIKeys(translProviderSelect, 'translation');
             });
-            cascadeModels(translProviderSelect, translModelSelect, masterTranslModelSelect, translProviderLabelMap);
+            cascadeModels(translProviderSelect, translModelSelect, masterTranslModelSelect, translProviderIndexMap);
             updateAPIKeys(translProviderSelect, 'translation');
         }
 

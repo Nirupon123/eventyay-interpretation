@@ -34,6 +34,12 @@ from .utils import (
 PLUGIN_MODULE = "interpretation"
 
 
+def _parse_bool(val) -> bool:
+    if isinstance(val, str):
+        return val.lower() in ("true", "t", "1", "yes", "y", "on")
+    return bool(val)
+
+
 def notify_video_room_config_changed(event) -> None:
     """Push event.updated so video SPA reloads room config (plugin stream fields)."""
     try:
@@ -142,7 +148,7 @@ def _apply_backend_config(interpretation: RoomInterpretation, data: dict) -> Non
             data["backend_config"],
         )
     if "enable_transcription" in data:
-        interpretation.enable_transcription = data.get("enable_transcription") is True
+        interpretation.enable_transcription = _parse_bool(data.get("enable_transcription"))
     if "transcription_provider" in data:
         interpretation.transcription_provider = (data.get("transcription_provider") or "").strip()
     if "transcription_model" in data:
@@ -150,7 +156,7 @@ def _apply_backend_config(interpretation: RoomInterpretation, data: dict) -> Non
     if "source_language" in data:
         interpretation.source_language = (data.get("source_language") or "").strip()
     if "enable_translation" in data:
-        interpretation.enable_translation = data.get("enable_translation") is True
+        interpretation.enable_translation = _parse_bool(data.get("enable_translation"))
     if "translation_provider" in data:
         interpretation.translation_provider = (data.get("translation_provider") or "").strip()
     if "translation_model" in data:
@@ -172,14 +178,14 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
         interpretation.interpreter = interpreter
 
     if "room_enabled" in data:
-        interpretation.room_enabled = bool(data.get("room_enabled"))
+        interpretation.room_enabled = _parse_bool(data.get("room_enabled"))
 
     # Validation: Enforce AI Configuration Invariants
-    trans_enabled = data.get("enable_transcription", interpretation.enable_transcription)
+    trans_enabled = _parse_bool(data.get("enable_transcription", interpretation.enable_transcription))
     trans_provider = (data.get("transcription_provider", interpretation.transcription_provider) or "").strip()
     trans_model = (data.get("transcription_model", interpretation.transcription_model) or "").strip()
 
-    transl_enabled = data.get("enable_translation", interpretation.enable_translation)
+    transl_enabled = _parse_bool(data.get("enable_translation", interpretation.enable_translation))
     transl_provider = (data.get("translation_provider", interpretation.translation_provider) or "").strip()
     transl_model = (data.get("translation_model", interpretation.translation_model) or "").strip()
 

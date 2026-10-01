@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import get_object_or_404
 from eventyay.api.auth.permission import EventPermission
 from eventyay.api.mixins import PretalxViewSetMixin
@@ -55,6 +57,8 @@ class AttendeeVideoPermission(BasePermission):
 
 
 PLUGIN_MODULE = "interpretation"
+
+logger = logging.getLogger(__name__)
 
 
 class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
@@ -241,7 +245,7 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
             token = data.get("listener_token") if is_oauth else data.get("token")
             return Response({"token": token})
         else:
-            print(f"DEBUG: VoxBento API Error: {response.text}")
+            logger.warning("VoxBento API Error (%s): %s", response.status_code, response.text)
             return Response({"detail": f"VoxBento API Error: {response.text}"}, status=400)
 
     @action(detail=False, methods=["get"], url_path="streams")
