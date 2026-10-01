@@ -1,5 +1,6 @@
-{% load i18n %}
-<form method="post" class="interpretation-room-form" id="room-{{ entry.room.pk }}">
+{% load i18n static %}
+<form method="post" class="interpretation-room-form" id="room-form-{{ entry.room.pk }}"
+      data-configured-keys='{"openai": {{ entry.configure_form.configured_api_keys.openai|yesno:"true,false" }}, "deepgram": {{ entry.configure_form.configured_api_keys.deepgram|yesno:"true,false" }}, "nvidia": {{ entry.configure_form.configured_api_keys.nvidia|yesno:"true,false" }}, "elevenlabs": {{ entry.configure_form.configured_api_keys.elevenlabs|yesno:"true,false" }}, "translation_openai": {{ entry.configure_form.configured_api_keys.translation_openai|yesno:"true,false" }}, "openrouter": {{ entry.configure_form.configured_api_keys.openrouter|yesno:"true,false" }}, "gemini": {{ entry.configure_form.configured_api_keys.gemini|yesno:"true,false" }}, "anthropic": {{ entry.configure_form.configured_api_keys.anthropic|yesno:"true,false" }}, "groq": {{ entry.configure_form.configured_api_keys.groq|yesno:"true,false" }}}'>
     {% csrf_token %}
     <input type="hidden" name="{{ room_id_key }}" value="{{ entry.room.pk }}">
 
@@ -26,6 +27,97 @@
                     {{ entry.configure_form.room_enabled }}
                     {{ entry.configure_form.room_enabled.label }}
                 </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="voxbento-ai-config" style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+        <h4>{% trans "Event Audio Transcription" %}</h4>
+        <div class="checkbox">
+            <label>
+                {{ entry.configure_form.enable_transcription }}
+                {{ entry.configure_form.enable_transcription.label }}
+            </label>
+        </div>
+        <div class="row transcription-fields">
+            <div class="col-md-4 form-group">
+                <label for="{{ entry.configure_form.source_language.id_for_label }}">
+                    {{ entry.configure_form.source_language.label }}
+                </label>
+                {{ entry.configure_form.source_language }}
+            </div>
+            <div class="col-md-4 form-group">
+                <label for="{{ entry.configure_form.transcription_provider.id_for_label }}">
+                    {{ entry.configure_form.transcription_provider.label }}
+                </label>
+                {{ entry.configure_form.transcription_provider }}
+            </div>
+            <div class="col-md-4 form-group">
+                <label for="{{ entry.configure_form.transcription_model.id_for_label }}">
+                    {{ entry.configure_form.transcription_model.label }}
+                </label>
+                {{ entry.configure_form.transcription_model }}
+            </div>
+        </div>
+        <div class="row api-key-container" data-purpose="transcription" style="display: none;">
+            <div class="col-md-12">
+                <div class="well well-sm" style="margin-top: 0; margin-bottom: 15px; background-color: #fcf8e3; border-color: #faebcc; color: #8a6d3b;">
+                    <div class="api-key-status" style="display: none;">
+                        <i class="fa fa-check text-success"></i> <strong>{% trans "API Key is already configured for this provider." %}</strong>
+                        <button type="button" class="btn btn-xs btn-default pull-right btn-update-key" style="background-color: #ffffff; color: #333333; border: 1px solid #cccccc; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">{% trans "Update Key" %}</button>
+                    </div>
+                    <div class="api-key-input" style="display: none;">
+                        <p style="margin-bottom: 10px;"><i class="fa fa-exclamation-triangle"></i> {% trans "This provider requires an API key." %}</p>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="password" class="form-control" placeholder="{% trans 'Enter API Key' %}" name="">
+                            <button type="button" class="btn btn-default btn-cancel-update" style="display: none;">{% trans "Cancel" %}</button>
+                            <button type="submit" name="{{ room_action_key }}" value="save" class="btn btn-primary btn-save-key-inline" style="display: none;">{% trans "Update" %}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="voxbento-ai-config" style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+        <h4>{% trans "Event Audio Translation" %}</h4>
+        <div class="checkbox">
+            <label>
+                {{ entry.configure_form.enable_translation }}
+                {{ entry.configure_form.enable_translation.label }}
+            </label>
+        </div>
+        <p class="text-muted small">{% trans "This requires Event Audio Transcription to be enabled, as translations are generated from the canonical transcript." %}</p>
+        <div class="row translation-fields">
+            <div class="col-md-6 form-group">
+                <label for="{{ entry.configure_form.translation_provider.id_for_label }}">
+                    {{ entry.configure_form.translation_provider.label }}
+                </label>
+                {{ entry.configure_form.translation_provider }}
+            </div>
+            <div class="col-md-6 form-group">
+                <label for="{{ entry.configure_form.translation_model.id_for_label }}">
+                    {{ entry.configure_form.translation_model.label }}
+                </label>
+                {{ entry.configure_form.translation_model }}
+            </div>
+        </div>
+        <div class="row api-key-container" data-purpose="translation" style="display: none;">
+            <div class="col-md-12">
+                <div class="well well-sm" style="margin-top: 0; margin-bottom: 15px; background-color: #fcf8e3; border-color: #faebcc; color: #8a6d3b;">
+                    <div class="api-key-status" style="display: none;">
+                        <i class="fa fa-check text-success"></i> <strong>{% trans "API Key is already configured for this provider." %}</strong>
+                        <button type="button" class="btn btn-xs btn-default pull-right btn-update-key" style="background-color: #ffffff; color: #333333; border: 1px solid #cccccc; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">{% trans "Update Key" %}</button>
+                    </div>
+                    <div class="api-key-input" style="display: none;">
+                        <p style="margin-bottom: 10px;"><i class="fa fa-exclamation-triangle"></i> {% trans "This provider requires an API key." %}</p>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="password" class="form-control" placeholder="{% trans 'Enter API Key' %}" name="">
+                            <button type="button" class="btn btn-default btn-cancel-update" style="display: none;">{% trans "Cancel" %}</button>
+                            <button type="submit" name="{{ room_action_key }}" value="save" class="btn btn-primary btn-save-key-inline" style="display: none;">{% trans "Update" %}</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -83,4 +175,6 @@
             </p>
         {% endif %}
     {% endif %}
+
+    <script src="{% static 'interpretation/js/room_configure.js' %}"></script>
 </form>

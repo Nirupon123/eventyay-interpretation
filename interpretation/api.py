@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import get_object_or_404
 from eventyay.api.auth.permission import EventPermission
 from eventyay.api.mixins import PretalxViewSetMixin
@@ -55,6 +57,8 @@ class AttendeeVideoPermission(BasePermission):
 
 
 PLUGIN_MODULE = "interpretation"
+
+logger = logging.getLogger(__name__)
 
 
 class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
@@ -223,9 +227,9 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="listener-token")
     def listener_token(self, request, room_pk=None, **kwargs):
-        self._ensure_room()
+        room = self._ensure_room()
 
-        oauth_path = f"api/v1/events/{self.event.slug}/rooms/{room_pk}/listener-token"
+        oauth_path = f"api/v1/events/{self.event.slug}/rooms/{room.pk}/listener-token"
         legacy_path = "api/v1/tokens/listener"
 
         payload = {"event_slug": self.event.slug}
@@ -241,7 +245,8 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
             token = data.get("listener_token") if is_oauth else data.get("token")
             return Response({"token": token})
         else:
-            return Response({"detail": f"VoxBento API Error: {response.text}"}, status=400)
+            logger.warning("VoxBento API Error (%s) when fetching listener token.", response.status_code)
+            return Response({"detail": "Failed to retrieve listener token from VoxBento."}, status=400)
 
     @action(detail=False, methods=["get"], url_path="streams")
     def streams(self, request, room_pk=None, **kwargs):
