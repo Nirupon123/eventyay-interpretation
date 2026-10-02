@@ -305,7 +305,7 @@ class InterpretationRoomSettings(
             from django.db import transaction
 
             sync_needed = False
-            
+
             with transaction.atomic():
                 # Handle API Keys first inside transaction
                 api_keys = [
@@ -346,7 +346,10 @@ class InterpretationRoomSettings(
                             key_name = "translation_openai_api_key" if vp == "openai" else f"{vp}_api_key"
                             key_val = getattr(grant, key_name, None)
                             if key_val and not validate_provider_key(vp, key_val):
-                                return None, f"The API key for {vp.capitalize()} (Translation) is invalid, expired, or revoked."
+                                return (
+                                    None,
+                                    f"The API key for {vp.capitalize()} (Translation) is invalid, expired, or revoked.",
+                                )
 
                 # Validation passed, safe to update room interpretation
                 interpretation = update_room_interpretation(
