@@ -375,6 +375,7 @@ class InterpretationRoomSettings(
             # Sync after atomic block to avoid locking during network request
             if sync_needed:
                 from .backends.voxbento_api import sync_voxbento_api_keys
+
                 sync_voxbento_api_keys(event)
 
         except ValueError as exc:
