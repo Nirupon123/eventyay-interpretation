@@ -222,7 +222,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     statusDiv.style.display = 'none';
                     inputDiv.style.display = 'block';
                     inputField.required = true;
-                    if (isConfigured) {
+                    if (isConfigured && !isInvalid) {
                         if (cancelButton) cancelButton.style.display = 'inline-block';
                         if (updateInlineButton) updateInlineButton.style.display = 'inline-block';
                     } else {

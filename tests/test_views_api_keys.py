@@ -56,7 +56,7 @@ def test_invalid_replacement_leaves_stored_key_unchanged(
     assert voxbento_grant.translation_openai_api_key == "sk-valid-stored-key"
 
     # 2. UI marks only the replacement as invalid
-    assert b"invalid_api_keys" in response.content or b"invalid or rejected" in response.content
+    assert b"data-invalid-keys" in response.content or b"invalid, expired, or revoked" in response.content
     assert response.context["rooms"][0]["configure_form"].invalid_api_keys.get("translation_openai") is True
 
 
