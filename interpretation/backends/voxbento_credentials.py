@@ -89,7 +89,7 @@ def clear_voxbento_credentials(event: Event) -> None:
         import redis.exceptions
 
         try:
-            with _get_cache_lock(lock_key, timeout=10, blocking_timeout=12):
+            with _get_cache_lock(lock_key, timeout=22, blocking_timeout=24):
                 grant.refresh_from_db()
 
                 # Best effort revoke and webhook delete
@@ -131,7 +131,12 @@ def clear_voxbento_credentials(event: Event) -> None:
                                 timeout=(3.0, 5.0),
                                 allow_redirects=False,
                             )
-                            resp.raise_for_status()
+                            if not (200 <= resp.status_code < 300):
+                                logger.warning(
+                                    "OAuth revoke returned unexpected status %s for event %s",
+                                    resp.status_code,
+                                    event.id,
+                                )
                     except Exception as e:
                         logger.error(
                             "Failed to revoke VoxBento OAuth token for event %s: %s",

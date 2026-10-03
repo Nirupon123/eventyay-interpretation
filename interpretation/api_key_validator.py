@@ -88,7 +88,7 @@ def validate_provider_key(provider: str, api_key: str) -> bool:
 
         if resp is not None:
             # Explicit auth rejection
-            if resp.status_code in (401, 403, 400):
+            if resp.status_code in (401, 403):
                 cache.set(cache_key, False, timeout=300)
                 return False
             # Valid response
@@ -99,9 +99,11 @@ def validate_provider_key(provider: str, api_key: str) -> bool:
             if resp.status_code == 429 or resp.status_code >= 500:
                 cache.set(cache_key, True, timeout=300)
                 return True
-            # For 404s or other unexpected client errors, assume invalid endpoint/config
-            cache.set(cache_key, False, timeout=300)
-            return False
+            # For 400, 404s or other unexpected client errors, assume invalid endpoint/config
+            # but fail open so a provider-side change cannot prevent saving room settings.
+            logger.warning("Unexpected status %s from %s during key validation", resp.status_code, provider)
+            cache.set(cache_key, True, timeout=60)
+            return True
 
     except requests.RequestException as e:
         logger.warning(f"Failed to reach {provider} API for key validation: {e}")

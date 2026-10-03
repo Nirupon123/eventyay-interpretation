@@ -1,11 +1,11 @@
 """Shared per-room interpretation helpers for commons views and video admin API."""
 
 from __future__ import annotations
-from django.db import transaction
 
 from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from .backends import (
@@ -246,7 +246,7 @@ def update_room_interpretation(room, event, data: dict) -> RoomInterpretation:
 
     changed_interpreter = "interpreter" in data and interpretation.interpreter != old_interpreter
     needs_broadcast = changed_room_enabled or changed_interpreter or "language_streams" in data
-    
+
     if needs_broadcast:
         transaction.on_commit(lambda: notify_video_room_config_changed(event))
 
