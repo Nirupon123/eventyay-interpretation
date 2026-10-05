@@ -116,7 +116,6 @@ def _do_sync_single_room_to_voxbento(
             or grant.event_provisioning_failed
             or grant.is_disconnected
             or grant.needs_reauth
-            or grant.webhook_scope_denied
         ):
             return False
 
