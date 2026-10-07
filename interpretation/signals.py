@@ -18,8 +18,6 @@ for _key in VOXBENTO_EVENT_SETTINGS_KEYS:
     settings_hierarkey.add_default(_key, "", str)
 
 
-
-
 from collections import OrderedDict
 
 from django import forms
