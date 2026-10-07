@@ -1,4 +1,5 @@
 from django.dispatch import receiver
+from django.utils.translation import gettext_lazy as _
 from eventyay.base.settings import settings_hierarkey
 
 from .backends.susi_credentials import EVENT_SETTINGS_KEYS as SUSI_EVENT_SETTINGS_KEYS
