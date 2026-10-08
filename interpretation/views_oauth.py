@@ -32,7 +32,7 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
         client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
         if not client_id:
             messages.error(request, _("Please configure the VoxBento Client ID in Global Settings first."))
-            return redirect(f"/video/event/{kwargs.get('organizer')}/{kwargs.get('event')}/event/interpretation")
+            return redirect(f"/video/event/{kwargs.get('organizer')}/{kwargs.get('event')}/event/interpretation/")
 
         redirect_uri = self.request.build_absolute_uri(reverse("plugins:interpretation:oauth_callback"))
         redirect_uri = redirect_uri.split("?")[0]  # Strip automatically appended ?event= kwargs
@@ -42,7 +42,7 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
         voxbento_base = get_voxbento_base_url(event)
         if not voxbento_base:
             messages.error(request, _("Please configure the VoxBento Base URL in Interpreter settings first."))
-            return redirect(f"/video/event/{kwargs.get('organizer')}/{kwargs.get('event')}/event/interpretation")
+            return redirect(f"/video/event/{kwargs.get('organizer')}/{kwargs.get('event')}/event/interpretation/")
 
         verifier, challenge = generate_pkce()
 
@@ -90,7 +90,7 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             messages.error(request, _("Event not found for OAuth callback."))
             return redirect(reverse("control:index"))
 
-        dashboard_url = f"/video/event/{event.organizer.slug}/{event.slug}/event/interpretation"
+        dashboard_url = f"/video/event/{event.organizer.slug}/{event.slug}/event/interpretation/"
 
         error = request.GET.get("error")
         error_description = request.GET.get("error_description", "")
