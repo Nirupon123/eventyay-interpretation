@@ -1,7 +1,32 @@
 {% extends "eventyay_common/event/base.html" %}
+{% load static %}
 {% load i18n %}
 {% block title %}{% trans "Room settings" %} — {% trans "Interpretation" %}{% endblock %}
+
+{% block custom_header %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'interpretation/css/embedded.css' %}">
+{% endblock %}
+
 {% block content %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <style>{% include "interpretation/dashboard.css" %}</style>
 
     <header class="interpretation-hero interpretation-hero--subpage">

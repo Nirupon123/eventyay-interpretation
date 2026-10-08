@@ -1,0 +1,37 @@
+/* CSS for embedded interpretation views inside the Vue SPA */
+
+/* Hide global eventyay navigation when embedded or used in video SPA context */
+#wrapper > nav.navbar { display: none !important; }
+#wrapper > .navbar-default.sidebar { display: none !important; }
+
+/* Reset wrappers but KEEP horizontal padding to prevent Bootstrap .row horizontal scrolling */
+#wrapper { padding-top: 0 !important; margin-top: 0 !important; }
+#page-wrapper { margin: 0 !important; padding: 0 !important; border-left: none !important; }
+#page-wrapper > .container-fluid { margin-top: 0 !important; padding-top: 5px !important; padding-left: 15px !important; padding-right: 15px !important; }
+
+#page-wrapper > footer { display: none !important; }
+footer { display: none !important; }
+
+/* Remove padding/margin from body and html if any, and force white background so there's no grey box at the bottom */
+html, body, #wrapper, #page-wrapper { padding-top: 0 !important; margin-top: 0 !important; background-color: #fff !important; }
+
+/* Hide the breadcrumb section if it's taking up space */
+.header-breadcrumb { display: none !important; }
+.page-header { display: none !important; }
+
+/* Ensure the iframe body doesn't add mysterious top gaps */
+#page-wrapper > .container-fluid > * { margin-top: 0 !important; }
+
+/* Adjust font sizes as requested by user and remove the dashed line */
+.interpretation-hero-title { font-size: 1.8rem !important; margin-bottom: 0.2rem !important; }
+.interpretation-hero-lead { font-size: 1.25rem !important; }
+.interpretation-hero { padding: 0 0 1rem !important; margin: 0 0 1rem !important; border-bottom: none !important; }
+
+/* Responsive layout fix for columns inside the embedded iframe */
+@media (max-width: 1200px) {
+    .col-md-4 {
+        width: 100% !important;
+        float: none !important;
+        margin-bottom: 2rem !important;
+    }
+}

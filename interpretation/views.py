@@ -101,7 +101,18 @@ class InterpretationEnabledMixin:
         return super().dispatch(request, *args, **kwargs)
 
 
+class XFrameOptionsSameOriginMixin:
+    def dispatch(self, *args, **kwargs):
+        response = super().dispatch(*args, **kwargs)
+        if hasattr(response, "setdefault"):
+            response.setdefault("X-Frame-Options", "SAMEORIGIN")
+        else:
+            response["X-Frame-Options"] = "SAMEORIGIN"
+        return response
+
+
 class InterpretationOverview(
+    XFrameOptionsSameOriginMixin,
     InterpretationEnabledMixin,
     EventSettingsViewMixin,
     EventPermissionRequiredMixin,
@@ -162,6 +173,7 @@ class InterpretationOverview(
 
 
 class InterpretationInterpreters(
+    XFrameOptionsSameOriginMixin,
     InterpretationEnabledMixin,
     EventSettingsViewMixin,
     EventPermissionRequiredMixin,
@@ -253,6 +265,7 @@ class InterpretationInterpreters(
 
 
 class InterpretationRoomSettings(
+    XFrameOptionsSameOriginMixin,
     InterpretationEnabledMixin,
     EventSettingsViewMixin,
     EventPermissionRequiredMixin,
