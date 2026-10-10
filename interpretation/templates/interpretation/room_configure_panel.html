@@ -6,7 +6,7 @@
     <input type="hidden" name="{{ room_id_key }}" value="{{ entry.room.pk }}">
 
     <div class="interpretation-room-panel-grid">
-        <div class="form-group">
+        <div class="form-group" style="display: none;">
             <label for="{{ entry.configure_form.interpreter.id_for_label }}">
                 {{ entry.configure_form.interpreter.label }}
             </label>
@@ -24,7 +24,7 @@
             </p>
         {% endif %}
 
-        <div class="form-group">
+        <div class="form-group" style="display: none;">
             <div class="checkbox">
                 <label>
                     {{ entry.configure_form.room_enabled }}

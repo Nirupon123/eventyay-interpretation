@@ -83,7 +83,7 @@
                                     <form method="post" action="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}" class="m-0" target="_top">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-primary btn-sm">
-                                            <i class="fa fa-plug"></i> {% trans "Reconnect" %}
+                                            <i class="fa fa-plug"></i> {% trans "Connect" %}
                                         </button>
                                     </form>
                                 {% endif %}

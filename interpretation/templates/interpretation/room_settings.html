@@ -4,6 +4,7 @@
 {% block title %}{% trans "Room settings" %} — {% trans "Interpretation" %}{% endblock %}
 
 {% block custom_header %}
+    <link rel="stylesheet" type="text/css" href="{% static 'interpretation/dashboard.css' %}" />
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'interpretation/css/embedded.css' %}">
 <script src="{% static 'interpretation/js/embedded.js' %}"></script>
@@ -28,7 +29,7 @@
 
 
 
-    <style>{% include "interpretation/dashboard.css" %}</style>
+    
 
     <header class="interpretation-hero interpretation-hero--subpage">
         <div class="interpretation-hero-text">
