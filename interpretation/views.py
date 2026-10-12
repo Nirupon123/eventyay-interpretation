@@ -518,6 +518,11 @@ class InterpretationRoomSettings(
         existing = {ri.room_id: ri for ri in RoomInterpretation.objects.filter(room__event=event)}
 
         grant = getattr(event, "voxbento_oauth_grant", None)
+        try:
+            from .backends.voxbento_credentials import get_voxbento_base_url
+            voxbento_base_url = get_voxbento_base_url(event)
+        except Exception:
+            voxbento_base_url = ""
         rooms = []
         for room in event.rooms.filter(deleted=False).order_by("name"):
             interpretation = existing.get(room.pk)
@@ -528,10 +533,16 @@ class InterpretationRoomSettings(
             api_key_error = None
             invalid_api_keys = {}
 
+            vox_room_url = None
+            if selected == "voxbento" and voxbento_base_url:
+                room_ref = (interpretation.backend_session_id if interpretation and interpretation.backend_session_id else room.pk)
+                vox_room_url = f"{voxbento_base_url.rstrip('/')}/workspace/events/by-slug/{event.slug}/rooms/{room_ref}/"
+
             rooms.append(
                 {
                     "room": room,
                     "data": data,
+                    "voxbento_room_url": vox_room_url,
                     "api_key_error": api_key_error,
                     "configure_form": RoomConfigureForm(
                         prefix=prefix,

@@ -220,6 +220,15 @@
                                     <i class="fa fa-play"></i> {% trans "Test connection" %}
                                 </button>
 
+                                {% if backend.id == "voxbento" %}
+                                <a href="{% url 'plugins:interpretation:connect' organizer=request.event.organizer.slug event=request.event.slug interpreter_id=backend.id %}"
+                                   class="btn btn-default"
+                                   id="btn-reconnect-voxbento"
+                                   style="color: #0284c7; border-color: #0284c7;"
+                                   title="{% trans 'Link or switch your personal VoxBento account for this event' %}">
+                                    <i class="fa fa-user-plus"></i> {% trans "Connect / Switch Account" %}
+                                </a>
+                                {% endif %}
                                 <button type="submit" name="interpretation_interpreter_action" value="disconnect" class="btn btn-default text-danger" style="color: #d9534f; border-color: #d4d4d4;">
                                     <i class="fa fa-chain-broken"></i> {% trans "Disconnect" %}
                                 </button>
@@ -286,6 +295,44 @@
 .lang-pill.pill-more { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; cursor: pointer; }
 .actions-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .btn-view-status { background: #fff; border: 1px solid #e2e8f0; color: #334155; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+/* Spacing between Status and Caption Languages */
+.table-rooms th:nth-child(3),
+.table-rooms td:nth-child(3),
+.interpretation-rooms-table th:nth-child(3),
+.interpretation-rooms-table td:nth-child(3) {
+    padding-right: 36px !important;
+}
+.table-rooms th:nth-child(4),
+.table-rooms td:nth-child(4),
+.interpretation-rooms-table th:nth-child(4),
+.interpretation-rooms-table td:nth-child(4) {
+    padding-left: 24px !important;
+}
+.btn-voxbento-room {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #0284c7;
+    background-color: #f0f9ff;
+    border: 1px solid #bae6fd;
+    text-decoration: none !important;
+    transition: all 0.15s ease-in-out;
+    margin-right: 8px;
+    white-space: nowrap;
+}
+.btn-voxbento-room:hover {
+    color: #0369a1;
+    background-color: #e0f2fe;
+    border-color: #7dd3fc;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.btn-voxbento-room i {
+    font-size: 11px;
+}
 .btn-configure { background: #0ea5e9; border: 1px solid #0ea5e9; color: #fff; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
 .btn-configure:hover, .btn-configure:focus { color: #fff; background: #0284c7; }
 .btn-more { background: transparent; border: none; color: #64748b; padding: 6px; font-size: 18px; outline: none; }
@@ -331,8 +378,8 @@
                                 <tr>
                                     <th>{% trans "Room" %} &nbsp;<i class="fa fa-sort" style="color: #cbd5e1;"></i></th>
                                     <th>{% trans "Interpreter service" %}</th>
-                                    <th>{% trans "Status" %}</th>
-                                    <th>{% trans "Caption languages" %}</th>
+                                    <th style="padding-right: 36px;">{% trans "Status" %}</th>
+                                    <th style="padding-left: 24px;">{% trans "Caption languages" %}</th>
                                     <th class="text-right">{% trans "Actions" %}</th>
                                 </tr>
                             </thead>
@@ -392,7 +439,7 @@
                                                 {% endif %}
                                             </div>
                                         </td>
-                                        <td>
+                                        <td style="padding-left: 24px;">
                                             <div class="lang-pills">
                                                 {% if entry.data.target_languages %}
                                                     {% for lang in entry.data.target_languages_display|slice:":3" %}
@@ -421,6 +468,15 @@
                                         </td>
                                         <td class="actions-cell">
                                             
+                                            {% if entry.voxbento_room_url %}
+                                                <a href="{{ entry.voxbento_room_url }}"
+                                                   target="_blank"
+                                                   rel="noopener noreferrer"
+                                                   class="btn-voxbento-room"
+                                                   title="{% trans 'Open room in VoxBento to manage stream and floor bot' %}">
+                                                    <i class="fa fa-external-link"></i> {% trans "VoxBento Room" %}
+                                                </a>
+                                            {% endif %}
                                             <button type="button"
                                                     class="btn-configure interpretation-room-toggle"
                                                     data-toggle="collapse"
@@ -429,9 +485,7 @@
                                                     aria-controls="room-panel-{{ entry.room.pk }}">
                                                 <i class="fa fa-cog"></i> {% trans "Configure" %}
                                             </button>
-                                            <button type="button" class="btn-more">
-                                                <i class="fa fa-ellipsis-v"></i>
-                                            </button>
+
                                         </td>
                                     </tr>
                                     <tr class="interpretation-room-panel-row">
