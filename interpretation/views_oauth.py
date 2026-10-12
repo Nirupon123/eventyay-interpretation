@@ -70,7 +70,9 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
             "code_challenge_method": "S256",
             "event": event.slug,
             "state": state,
-            "login_hint": request.user.email if (request.user and request.user.is_authenticated and request.user.email) else "",
+            "login_hint": request.user.email
+            if (request.user and request.user.is_authenticated and request.user.email)
+            else "",
         }
 
         auth_url = f"{voxbento_base}/oauth/authorize?{urllib.parse.urlencode(params)}"
@@ -78,7 +80,6 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
 
 
 class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
-
     def _popup_response(self, url):
         html = f"""
         <html><body>

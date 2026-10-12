@@ -1,12 +1,11 @@
+from csp.decorators import csp_update
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views import View
-from csp.decorators import csp_update
-from django.utils.decorators import method_decorator
 from eventyay.control.permissions import EventPermissionRequiredMixin
-from eventyay.control.views.event import EventSettingsViewMixin
 
 from .backends import get_backend, list_available_interpreters
 from .backends.voxbento_oauth import VoxbentoTemporarilyUnavailable
@@ -113,7 +112,7 @@ class XFrameOptionsSameOriginMixin:
         return response
 
 
-@method_decorator(csp_update({'SCRIPT_SRC': "'self' 'unsafe-eval' https://js.stripe.com"}), name='dispatch')
+@method_decorator(csp_update({"SCRIPT_SRC": "'self' 'unsafe-eval' https://js.stripe.com"}), name="dispatch")
 class InterpretationOverview(
     XFrameOptionsSameOriginMixin,
     InterpretationEnabledMixin,
@@ -148,7 +147,6 @@ class InterpretationOverview(
                 request, _("VoxBento requires reauthorization. Please reconnect via the Configure interpreters page.")
             )
 
-        
         room_view = InterpretationRoomSettings()
         room_view.request = request
         room_view.args = args
@@ -316,8 +314,6 @@ class InterpretationRoomSettings(
         return render(request, self.template_name, self.get_context_data())
 
     def post(self, request, *args, **kwargs):
-
-
 
         event = request.event
         room_id = request.POST.get(ROOM_ID_KEY)
@@ -520,6 +516,7 @@ class InterpretationRoomSettings(
         grant = getattr(event, "voxbento_oauth_grant", None)
         try:
             from .backends.voxbento_credentials import get_voxbento_base_url
+
             voxbento_base_url = get_voxbento_base_url(event)
         except Exception:
             voxbento_base_url = ""
@@ -535,8 +532,14 @@ class InterpretationRoomSettings(
 
             vox_room_url = None
             if selected == "voxbento" and voxbento_base_url:
-                room_ref = (interpretation.backend_session_id if interpretation and interpretation.backend_session_id else room.pk)
-                vox_room_url = f"{voxbento_base_url.rstrip('/')}/workspace/events/by-slug/{event.slug}/rooms/{room_ref}/"
+                room_ref = (
+                    interpretation.backend_session_id
+                    if interpretation and interpretation.backend_session_id
+                    else room.pk
+                )
+                vox_room_url = (
+                    f"{voxbento_base_url.rstrip('/')}/workspace/events/by-slug/{event.slug}/rooms/{room_ref}/"
+                )
 
             rooms.append(
                 {
