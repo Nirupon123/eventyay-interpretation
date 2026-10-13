@@ -532,14 +532,15 @@ class InterpretationRoomSettings(
 
             vox_room_url = None
             if selected == "voxbento" and voxbento_base_url:
-                room_ref = (
-                    interpretation.backend_session_id
-                    if interpretation and interpretation.backend_session_id
-                    else room.pk
-                )
-                vox_room_url = (
-                    f"{voxbento_base_url.rstrip('/')}/workspace/events/by-slug/{event.slug}/rooms/{room_ref}/"
-                )
+                if interpretation and interpretation.backend_session_id:
+                    room_ref = interpretation.backend_session_id
+                    vox_room_url = (
+                        f"{voxbento_base_url.rstrip('/')}/workspace/events/by-slug/{event.slug}/rooms/{room_ref}/?by=id"
+                    )
+                else:
+                    room_ref = room.pk
+                    base = voxbento_base_url.rstrip("/")
+                    vox_room_url = f"{base}/workspace/events/by-slug/{event.slug}/rooms/by-eventyay/{room_ref}/"
 
             rooms.append(
                 {
