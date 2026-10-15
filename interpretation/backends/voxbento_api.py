@@ -140,9 +140,24 @@ def create_voxbento_event(event: Event) -> None:
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
+    organizer_emails = set()
+    if hasattr(event, "organizer") and event.organizer:
+        from django.db.models import Q
+
+        teams = (
+            event.organizer.teams.filter(can_change_event_settings=True)
+            .filter(Q(all_events=True) | Q(limit_events=event))
+            .distinct()
+        )
+        for team in teams:
+            for u in team.members.filter(is_active=True):
+                if u.email:
+                    organizer_emails.add(u.email.lower().strip())
+
     payload = {
         "slug": event.slug,
         "name": str(event.name),
+        "organizer_emails": list(organizer_emails),
     }
 
     resp = requests.post(api_url, headers=headers, json=payload, timeout=5.0)

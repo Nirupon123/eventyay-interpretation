@@ -92,6 +92,16 @@ def _public_backend_config(interpretation: RoomInterpretation | None) -> dict:
     return strip_room_credential_keys(interpretation.backend_config)
 
 
+def get_language_display_names(codes):
+    from .language_map import language_name_for_code
+
+    names = []
+    for c in codes:
+        name = language_name_for_code(c)
+        names.append(str(c).title() if name == str(c).strip().lower() else name)
+    return names
+
+
 def serialize_room_interpretation(room, event, interpretation=None) -> dict:
     if interpretation is None:
         interpretation = get_interpretation(room)
@@ -113,6 +123,9 @@ def serialize_room_interpretation(room, event, interpretation=None) -> dict:
         "interpreter_ready": is_room_interpretation_ready(room, event, interpretation),
         "available_interpreters": list_available_interpreters(event),
         "target_languages": list(interpretation.target_languages or []) if interpretation else [],
+        "target_languages_display": get_language_display_names(interpretation.target_languages or [])
+        if interpretation
+        else [],
         "transcription_provider": interpretation.transcription_provider if interpretation else "",
         "transcription_model": interpretation.transcription_model if interpretation else "",
         "enable_transcription": interpretation.enable_transcription if interpretation else False,
@@ -363,6 +376,7 @@ def clear_room_interpretation_setup(room, event) -> RoomInterpretation:
             "translation_provider": "",
             "translation_model": "",
             "target_languages": [],
+            "target_languages_display": [],
             "language_streams": [],
         },
     )
