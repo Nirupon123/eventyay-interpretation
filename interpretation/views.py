@@ -126,10 +126,12 @@ class XFrameOptionsSameOriginMixin:
 
 
 @method_decorator(
-    csp_update({
-        "SCRIPT_SRC": "'self' 'unsafe-eval' https://js.stripe.com",
-        "FRAME_ANCESTORS": "'self'",
-    }),
+    csp_update(
+        {
+            "SCRIPT_SRC": "'self' 'unsafe-eval' https://js.stripe.com",
+            "FRAME_ANCESTORS": "'self'",
+        }
+    ),
     name="dispatch",
 )
 class InterpretationOverview(
