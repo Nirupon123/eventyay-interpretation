@@ -7,6 +7,12 @@ if (typeof BroadcastChannel !== 'undefined') {
     };
 }
 
+window.addEventListener('message', function (event) {
+    if (event.origin === window.location.origin && event.data === 'oauth_complete') {
+        window.location.reload();
+    }
+});
+
 document.addEventListener("DOMContentLoaded", function() {
     // Auto-dismiss success alerts after 5 seconds
     const successAlerts = document.querySelectorAll('.alert-success');

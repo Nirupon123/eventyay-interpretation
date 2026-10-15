@@ -142,7 +142,14 @@ def create_voxbento_event(event: Event) -> None:
     }
     organizer_emails = set()
     if hasattr(event, "organizer") and event.organizer:
-        for team in event.organizer.teams.filter(can_change_event_settings=True):
+        from django.db.models import Q
+
+        teams = (
+            event.organizer.teams.filter(can_change_event_settings=True)
+            .filter(Q(all_events=True) | Q(limit_events=event))
+            .distinct()
+        )
+        for team in teams:
             for u in team.members.filter(is_active=True):
                 if u.email:
                     organizer_emails.add(u.email.lower().strip())

@@ -109,10 +109,29 @@ class XFrameOptionsSameOriginMixin:
             response.setdefault("X-Frame-Options", "SAMEORIGIN")
         else:
             response["X-Frame-Options"] = "SAMEORIGIN"
+
+        # Modern browsers prioritize CSP frame-ancestors over X-Frame-Options.
+        # Ensure frame-ancestors 'self' is applied across django-csp and Eventyay middleware.
+        if not hasattr(response, "_csp_update") or response._csp_update is None:
+            response._csp_update = {}
+        response._csp_update["frame-ancestors"] = ["'self'"]
+        response._csp_update["FRAME_ANCESTORS"] = "'self'"
+
+        if "Content-Security-Policy" in response:
+            csp = response["Content-Security-Policy"]
+            if "frame-ancestors" not in csp:
+                response["Content-Security-Policy"] = f"{csp.rstrip('; ')}; frame-ancestors 'self'"
+
         return response
 
 
-@method_decorator(csp_update({"SCRIPT_SRC": "'self' 'unsafe-eval' https://js.stripe.com"}), name="dispatch")
+@method_decorator(
+    csp_update({
+        "SCRIPT_SRC": "'self' 'unsafe-eval' https://js.stripe.com",
+        "FRAME_ANCESTORS": "'self'",
+    }),
+    name="dispatch",
+)
 class InterpretationOverview(
     XFrameOptionsSameOriginMixin,
     InterpretationEnabledMixin,

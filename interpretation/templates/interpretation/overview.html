@@ -192,12 +192,13 @@
                     {% if entry.uses_event_credentials %}
                         {% if not entry.configured %}
                             {% if entry.id == "voxbento" %}
-                                <form method="post" action="{% url 'plugins:interpretation:oauth_connect' event=request.event.slug organizer=request.event.organizer.slug %}" target="voxbento_oauth" onsubmit="window.open('', 'voxbento_oauth', 'width=600,height=700');" style="margin:0;">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-primary" style="margin-bottom:10px;">
-                                        <i class="fa fa-plug"></i> {% if entry.is_disconnected %}{% trans "Connect" %}{% else %}{% trans "Connect" %}{% endif %}
-                                    </button>
-                                </form>
+                                <a href="{% url 'plugins:interpretation:oauth_connect' organizer=request.event.organizer.slug event=request.event.slug %}"
+                                   target="voxbento_oauth"
+                                   onclick="window.open(this.href, 'voxbento_oauth', 'width=600,height=700'); return false;"
+                                   class="btn btn-primary"
+                                   style="margin-bottom:10px;">
+                                    <i class="fa fa-plug"></i> {% if entry.is_disconnected %}{% trans "Connect" %}{% else %}{% trans "Connect" %}{% endif %}
+                                </a>
                             {% else %}
                                 <button type="button" class="btn btn-primary" style="margin-bottom:10px;">
                                     <i class="fa fa-plug"></i> {% if entry.is_disconnected %}{% trans "Connect" %}{% else %}{% trans "Connect" %}{% endif %}
@@ -221,7 +222,9 @@
                                 </button>
 
                                 {% if backend.id == "voxbento" %}
-                                <a href="{% url 'plugins:interpretation:connect' organizer=request.event.organizer.slug event=request.event.slug interpreter_id=backend.id %}"
+                                <a href="{% url 'plugins:interpretation:oauth_connect' organizer=request.event.organizer.slug event=request.event.slug %}"
+                                   target="voxbento_oauth"
+                                   onclick="window.open(this.href, 'voxbento_oauth', 'width=600,height=700'); return false;"
                                    class="btn btn-default"
                                    id="btn-reconnect-voxbento"
                                    style="color: #0284c7; border-color: #0284c7;"

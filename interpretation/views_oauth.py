@@ -28,12 +28,19 @@ def generate_pkce():
 class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
     permission = "can_change_event_settings"
 
+    def get(self, request, *args, **kwargs):
+        return self.post(request, *args, **kwargs)
+
     def post(self, request, *args, **kwargs):
         event = self.request.event
+        dashboard_url = reverse(
+            "plugins:interpretation:dashboard",
+            kwargs={"organizer": kwargs.get("organizer"), "event": kwargs.get("event")},
+        )
         client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
         if not client_id:
             messages.error(request, _("Please configure the VoxBento Client ID in Global Settings first."))
-            return redirect(f"/video/event/{kwargs.get('organizer')}/{kwargs.get('event')}/event/interpretation/")
+            return redirect(dashboard_url)
 
         redirect_uri = self.request.build_absolute_uri(reverse("plugins:interpretation:oauth_callback"))
         redirect_uri = redirect_uri.split("?")[0]  # Strip automatically appended ?event= kwargs
@@ -43,7 +50,7 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
         voxbento_base = get_voxbento_base_url(event)
         if not voxbento_base:
             messages.error(request, _("Please configure the VoxBento Base URL in Interpreter settings first."))
-            return redirect(f"/video/event/{kwargs.get('organizer')}/{kwargs.get('event')}/event/interpretation/")
+            return redirect(dashboard_url)
 
         verifier, challenge = generate_pkce()
 
@@ -87,18 +94,32 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             try {{
                 const bc = new BroadcastChannel('oauth_channel');
                 bc.postMessage('oauth_complete');
+            }} catch (e) {{
+                console.error(e);
+            }}
+            try {{
+                if (window.opener && window.opener !== window) {{
+                    window.opener.postMessage('oauth_complete', window.location.origin);
+                }}
+            }} catch (e) {{
+                console.error(e);
+            }}
+            try {{
                 window.close();
             }} catch (e) {{
                 console.error(e);
             }}
             setTimeout(function() {{
                 if (window.opener && window.opener !== window) {{
-                    window.opener.location.reload();
-                    window.close();
-                }} else {{
-                    window.location.href = "{url}";
+                    try {{ window.opener.location.reload(); }} catch (e) {{}}
                 }}
-            }}, 500);
+                try {{
+                    window.close();
+                }} catch (e) {{}}
+                setTimeout(function() {{
+                    window.location.href = "{url}";
+                }}, 400);
+            }}, 300);
         </script>
         </body></html>
         """
