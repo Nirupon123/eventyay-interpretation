@@ -105,7 +105,7 @@ def get_valid_access_token(grant_id):
 
                 updated = (
                     type(grant)
-                    .objects.filter(id=grant.id, is_disconnected=False, refresh_token=grant.refresh_token)
+                    .objects.filter(id=grant.id, is_disconnected=False)
                     .update(
                         access_token=new_tokens["access_token"],
                         refresh_token=new_tokens["refresh_token"],

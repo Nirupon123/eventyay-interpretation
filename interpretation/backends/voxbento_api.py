@@ -1,3 +1,4 @@
+import os
 import logging
 from urllib.parse import urljoin
 
@@ -13,10 +14,9 @@ logger = logging.getLogger(__name__)
 
 def get_webhook_target_url() -> str:
     """Return the webhook receiver URL."""
-    if settings.DEBUG:
-        host = getattr(settings, "INTERPRETATION_WEBHOOK_PUBLIC_HOST", None)
-        if host:
-            return urljoin(host, "/interpretation/voxbento/webhook/")
+    host = getattr(settings, "INTERPRETATION_WEBHOOK_PUBLIC_HOST", None) or os.environ.get("INTERPRETATION_WEBHOOK_PUBLIC_HOST")
+    if host:
+        return urljoin(host, "/interpretation/voxbento/webhook/")
 
     site_url = getattr(settings, "SITE_URL", "http://localhost:8000")
     return urljoin(site_url, "/interpretation/voxbento/webhook/")

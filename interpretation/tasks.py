@@ -170,8 +170,13 @@ def _do_sync_single_room_to_voxbento(
             and interpretation
             and interpretation.interpreter == RoomInterpretation.INTERPRETER_VOXBENTO
         ):
+            config = dict(interpretation.backend_config) if interpretation.backend_config else {}
+            config["voxbento_room_id"] = str(voxbento_room_id)
             # Use update() to avoid triggering post_save signals which cause RecursionError
-            type(interpretation).objects.filter(pk=interpretation.pk).update(backend_session_id=str(voxbento_room_id))
+            type(interpretation).objects.filter(pk=interpretation.pk).update(
+                backend_session_id=str(voxbento_room_id),
+                backend_config=config,
+            )
 
         if response_data.get("error") == 409:
             # We got a 409, meaning an active session was found.

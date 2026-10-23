@@ -24,12 +24,12 @@
     {% endif %}
     
     {% if voxbento_grant and not voxbento_grant.is_disconnected %}
-        {% if not voxbento_grant.event_provisioned or not voxbento_grant.webhook_subscription_id or voxbento_grant.webhook_subscription_failed or voxbento_grant.room_sync_failed %}
+        {% if voxbento_grant.event_provisioning_failed or voxbento_grant.webhook_subscription_failed or voxbento_grant.room_sync_failed %}
             <div class="alert alert-danger" style="margin-top: 20px; margin-bottom: 20px;">
                 <i class="fa fa-exclamation-triangle"></i>
                 <strong>{% trans "VoxBento Connection Issues" %}</strong>:
-                {% if not voxbento_grant.event_provisioned %}{% trans "Event provisioning failed" %}. {% endif %}
-                {% if not voxbento_grant.webhook_subscription_id or voxbento_grant.webhook_subscription_failed %}{% trans "Webhooks not active" %}. {% endif %}
+                {% if voxbento_grant.event_provisioning_failed %}{% trans "Event provisioning failed" %}. {% endif %}
+                {% if voxbento_grant.webhook_subscription_failed %}{% trans "Webhooks not active" %}. {% endif %}
                 {% if voxbento_grant.room_sync_failed %}{% trans "Rooms synchronization failed" %}. {% endif %}
                 
                 <form method="post" action="" style="display:inline-block; margin-left: 10px; margin-bottom:0;">

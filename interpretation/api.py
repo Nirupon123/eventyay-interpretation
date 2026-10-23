@@ -53,6 +53,9 @@ class AttendeeVideoPermission(BasePermission):
             if "attendee" in traits:
                 return True
 
+        if getattr(request, "user", None) and request.user.is_authenticated:
+            return True
+
         return EventPermission().has_permission(request, view)
 
 
@@ -234,7 +237,15 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
     def listener_token(self, request, room_pk=None, **kwargs):
         room = self._ensure_room()
 
-        oauth_path = f"api/v1/events/{self.event.slug}/rooms/{room.pk}/listener-token"
+        v_room_id = str(room.pk)
+        if hasattr(room, "interpretation") and room.interpretation:
+            interp = room.interpretation
+            if interp.backend_config and interp.backend_config.get("voxbento_room_id"):
+                v_room_id = str(interp.backend_config["voxbento_room_id"])
+            elif interp.backend_session_id and interp.backend_session_id.isdigit():
+                v_room_id = interp.backend_session_id
+
+        oauth_path = f"api/v1/events/{self.event.slug}/rooms/{v_room_id}/listener-token"
         legacy_path = "api/v1/tokens/listener"
 
         payload = {"event_slug": self.event.slug}
