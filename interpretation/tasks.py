@@ -37,6 +37,20 @@ def _mark_connection_failure_flags(event_id: int) -> None:
         logger.error(f"Failed to update grant failure flags for event {event_id}: {err}")
 
 
+def _retry_connection(task, exc: Exception, event_id: int) -> None:
+    """Retry task with backoff; on exhaustion mark failure flags and re-raise."""
+    if task.request.retries >= task.max_retries:
+        logger.error(f"Max retries exceeded syncing VoxBento connection for event {event_id}: {exc}")
+        _mark_connection_failure_flags(event_id)
+        raise exc
+    try:
+        task.retry(exc=exc)
+    except (MaxRetriesExceededError, requests.RequestException, redis.exceptions.LockError):
+        logger.error(f"Max retries exceeded syncing VoxBento connection for event {event_id}: {exc}")
+        _mark_connection_failure_flags(event_id)
+        raise
+
+
 @shared_task(bind=True, max_retries=5, retry_backoff=True)
 def sync_voxbento_connection(self, event_id: int) -> None:
     """
@@ -52,9 +66,14 @@ def sync_voxbento_connection(self, event_id: int) -> None:
         try:
             create_voxbento_event(event)
         except requests.RequestException as e:
-            if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code < 500:
+            if (
+                isinstance(e, requests.HTTPError)
+                and e.response is not None
+                and e.response.status_code < 500
+                and e.response.status_code not in (408, 429)
+            ):
                 raise
-            self.retry(exc=e)
+            _retry_connection(self, e, event_id)
 
         # Reload grant to ensure we have latest flags
         grant.refresh_from_db()
@@ -66,7 +85,12 @@ def sync_voxbento_connection(self, event_id: int) -> None:
         try:
             subscribe_to_voxbento_webhooks(event)
         except requests.RequestException as e:
-            if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code < 500:
+            if (
+                isinstance(e, requests.HTTPError)
+                and e.response is not None
+                and e.response.status_code < 500
+                and e.response.status_code not in (408, 429)
+            ):
                 logger.error(f"VoxBento webhook failed {e.response.status_code}: {e.response.text}")
                 from .models import VoxbentoOAuthGrant
 
@@ -74,7 +98,7 @@ def sync_voxbento_connection(self, event_id: int) -> None:
                     webhook_subscription_failed=True
                 )
             else:
-                self.retry(exc=e)
+                _retry_connection(self, e, event_id)
 
         # Bulk Sync Rooms
         sync_all_rooms_to_voxbento.delay(event_id)
@@ -87,11 +111,7 @@ def sync_voxbento_connection(self, event_id: int) -> None:
         _mark_connection_failure_flags(event_id)
     except (requests.RequestException, redis.exceptions.LockError) as e:
         logger.warning(f"Transient error syncing VoxBento connection for event {event_id}: {e}")
-        try:
-            self.retry(exc=e)
-        except MaxRetriesExceededError:
-            logger.error(f"Max retries exceeded syncing VoxBento connection for event {event_id}")
-            _mark_connection_failure_flags(event_id)
+        _retry_connection(self, e, event_id)
 
 
 @shared_task(bind=True, max_retries=5, retry_backoff=True)
