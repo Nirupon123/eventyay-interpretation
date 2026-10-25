@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 from urllib.parse import urljoin
 
 import requests
@@ -14,11 +14,38 @@ logger = logging.getLogger(__name__)
 
 def get_webhook_target_url() -> str:
     """Return the webhook receiver URL."""
-    host = getattr(settings, "INTERPRETATION_WEBHOOK_PUBLIC_HOST", None) or os.environ.get("INTERPRETATION_WEBHOOK_PUBLIC_HOST")
+    host = getattr(settings, "INTERPRETATION_WEBHOOK_PUBLIC_HOST", None) or os.environ.get(
+        "INTERPRETATION_WEBHOOK_PUBLIC_HOST"
+    )
     if host:
-        return urljoin(host, "/interpretation/voxbento/webhook/")
+        try:
+            from urllib.parse import urlparse
+            import socket
+
+            parsed = urlparse(host)
+            if parsed.hostname:
+                socket.gethostbyname(parsed.hostname)
+                return urljoin(host, "/interpretation/voxbento/webhook/")
+        except Exception as exc:
+            logger.warning(
+                "Configured INTERPRETATION_WEBHOOK_PUBLIC_HOST %s cannot be resolved (%s). Falling back.",
+                host,
+                exc,
+            )
 
     site_url = getattr(settings, "SITE_URL", "http://localhost:8000")
+    if "localhost" in site_url or "127.0.0.1" in site_url:
+        try:
+            import socket
+            from urllib.parse import urlparse
+
+            socket.gethostbyname("host.docker.internal")
+            parsed_site = urlparse(site_url)
+            port_part = f":{parsed_site.port}" if parsed_site.port else ""
+            return urljoin(f"http://host.docker.internal{port_part}", "/interpretation/voxbento/webhook/")
+        except Exception:
+            pass
+
     return urljoin(site_url, "/interpretation/voxbento/webhook/")
 
 

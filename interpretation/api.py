@@ -53,8 +53,51 @@ class AttendeeVideoPermission(BasePermission):
             if "attendee" in traits:
                 return True
 
+        # Check event-specific attendee or organizer access for authenticated users
         if getattr(request, "user", None) and request.user.is_authenticated:
-            return True
+            # Active staff / superuser session
+            if hasattr(request.user, "has_active_staff_session"):
+                session_key = getattr(getattr(request, "session", None), "session_key", None)
+                if session_key and request.user.has_active_staff_session(session_key):
+                    return True
+
+            # Event organizer / team permission
+            organizer = getattr(event, "organizer", None)
+            if organizer and hasattr(request.user, "has_event_permission"):
+                if request.user.has_event_permission(organizer, event, request=request):
+                    return True
+
+            # Public video access permitted by event settings
+            settings_obj = getattr(event, "settings", None)
+            if settings_obj and settings_obj.get("venueless_show_public_link", False):
+                return True
+
+            # Valid attendee ticket / order for this event
+            try:
+                from eventyay.common.templatetags.event_tags import user_has_valid_ticket
+
+                if user_has_valid_ticket({"request": request}, event):
+                    return True
+            except Exception:
+                pass
+
+            try:
+                from eventyay.base.models import Order, OrderPosition
+
+                allowed_statuses = [Order.STATUS_PAID]
+                if getattr(getattr(event, "settings", None), "venueless_allow_pending", False):
+                    allowed_statuses.append(Order.STATUS_PENDING)
+
+                if request.user.email and OrderPosition.objects.filter(
+                    order__event=event,
+                    order__email__iexact=request.user.email,
+                    order__status__in=allowed_statuses,
+                    canceled=False,
+                    addon_to__isnull=True,
+                ).exists():
+                    return True
+            except Exception:
+                pass
 
         return EventPermission().has_permission(request, view)
 

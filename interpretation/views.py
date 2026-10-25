@@ -1,3 +1,5 @@
+import logging
+
 from csp.decorators import csp_update
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
@@ -34,6 +36,8 @@ from .room_control import (
 )
 
 PLUGIN_MODULE = "interpretation"
+
+logger = logging.getLogger(__name__)
 
 
 def _notify_stop_result(request, room, result) -> None:
@@ -194,8 +198,21 @@ class InterpretationOverview(
 
         if request.POST.get("action") == "sync_all_rooms":
             from .backends.registry import get_backend
+            from .backends.voxbento_api import create_voxbento_event, subscribe_to_voxbento_webhooks
             from .backends.voxbento_oauth import VoxbentoTemporarilyUnavailable
             from .models import RoomInterpretation
+
+            grant = getattr(request.event, "voxbento_oauth_grant", None)
+            if grant and not grant.is_disconnected:
+                try:
+                    create_voxbento_event(request.event)
+                except Exception as e:
+                    logger.warning("Retry sync create_voxbento_event failed: %s", e)
+
+                try:
+                    subscribe_to_voxbento_webhooks(request.event)
+                except Exception as e:
+                    logger.warning("Retry sync subscribe_to_voxbento_webhooks failed: %s", e)
 
             backend = get_backend(RoomInterpretation.INTERPRETER_VOXBENTO)
             interpretations = RoomInterpretation.objects.filter(

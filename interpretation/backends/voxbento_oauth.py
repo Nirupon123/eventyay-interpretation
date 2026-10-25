@@ -96,6 +96,7 @@ def get_valid_access_token(grant_id):
             if not base_url:
                 raise VoxbentoReauthorizationRequired("VoxBento base URL is not configured")
 
+            initial_expires_at = grant.expires_at
             try:
                 new_tokens = call_voxbento_refresh(grant.refresh_token, base_url)
 
@@ -103,16 +104,26 @@ def get_valid_access_token(grant_id):
                 expires_in = new_tokens.get("expires_in", 3600)
                 expires_at = timezone.now() + timedelta(seconds=expires_in)
 
-                updated = (
-                    type(grant)
-                    .objects.filter(id=grant.id, is_disconnected=False)
-                    .update(
-                        access_token=new_tokens["access_token"],
-                        refresh_token=new_tokens["refresh_token"],
-                        expires_at=expires_at,
-                        needs_reauth=False,
-                    )
-                )
+                from django.db import transaction
+
+                with transaction.atomic():
+                    current_grant = type(grant).objects.select_for_update().filter(id=grant.id).first()
+                    if not current_grant or current_grant.is_disconnected:
+                        updated = 0
+                        reauth_msg = "Integration disconnected during refresh network call"
+                    elif current_grant.expires_at != initial_expires_at:
+                        # Another refresh or OAuth reauthorization updated credentials concurrently
+                        updated = 0
+                        reauth_msg = "Integration reconnected concurrently"
+                    else:
+                        current_grant.access_token = new_tokens["access_token"]
+                        current_grant.refresh_token = new_tokens["refresh_token"]
+                        current_grant.expires_at = expires_at
+                        current_grant.needs_reauth = False
+                        current_grant.save(
+                            update_fields=["access_token", "refresh_token", "expires_at", "needs_reauth"]
+                        )
+                        updated = 1
 
                 if updated == 0:
                     # Best-effort revoke the newly issued token since we aren't saving it
@@ -139,7 +150,18 @@ def get_valid_access_token(grant_id):
                                 )
                     except Exception:
                         pass
-                    raise VoxbentoReauthorizationRequired("Integration disconnected during refresh network call")
+
+                    # Re-check if grant was concurrently updated with valid tokens
+                    latest_grant = type(grant).objects.filter(id=grant.id).first()
+                    if (
+                        latest_grant
+                        and not latest_grant.is_disconnected
+                        and latest_grant.expires_at
+                        and latest_grant.expires_at > timezone.now() + timedelta(seconds=60)
+                    ):
+                        return latest_grant.access_token
+
+                    raise VoxbentoReauthorizationRequired(reauth_msg)
 
                 grant.access_token = new_tokens["access_token"]
                 grant.refresh_token = new_tokens["refresh_token"]
