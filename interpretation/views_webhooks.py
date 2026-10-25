@@ -122,7 +122,17 @@ class VoxbentoWebhookReceiverView(View):
             room_id = int(v_room_ref)
             return Room.objects.get(id=room_id, event=event)
         except (ValueError, Room.DoesNotExist):
-            return None
+            pass
+
+        # 3. If room mapping is missing (e.g. interrupted sync), trigger async reconciliation
+        try:
+            from .tasks import sync_all_rooms_to_voxbento
+
+            sync_all_rooms_to_voxbento.delay(event.id)
+        except Exception:
+            pass
+
+        return None
 
     def handle_transcription_started(self, event, data):
         room = self._get_room_from_booth_id(event, data.get("booth_id"))
@@ -173,8 +183,7 @@ class VoxbentoWebhookReceiverView(View):
 
             # Only clear backend_session_id if it's not a numeric VoxBento room ID
             is_numeric_room = (
-                interp.interpreter == RoomInterpretation.INTERPRETER_VOXBENTO
-                and interp.backend_session_id.isdigit()
+                interp.interpreter == RoomInterpretation.INTERPRETER_VOXBENTO and interp.backend_session_id.isdigit()
             )
             if not is_numeric_room:
                 interp.backend_session_id = ""

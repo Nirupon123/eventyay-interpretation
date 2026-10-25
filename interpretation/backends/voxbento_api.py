@@ -1,6 +1,7 @@
 import logging
 import os
-from urllib.parse import urljoin
+import socket
+from urllib.parse import urljoin, urlparse
 
 import requests
 from django.conf import settings
@@ -18,38 +19,23 @@ def get_webhook_target_url() -> str:
         "INTERPRETATION_WEBHOOK_PUBLIC_HOST"
     )
     if host:
-        try:
-            from urllib.parse import urlparse
-            import socket
-
-            parsed = urlparse(host)
-            if parsed.hostname:
-                socket.gethostbyname(parsed.hostname)
-                return urljoin(host, "/interpretation/voxbento/webhook/")
-        except Exception as exc:
-            logger.warning(
-                "Configured INTERPRETATION_WEBHOOK_PUBLIC_HOST %s cannot be resolved (%s). Falling back.",
-                host,
-                exc,
-            )
+        return urljoin(host, "/interpretation/voxbento/webhook/")
 
     site_url = getattr(settings, "SITE_URL", "http://localhost:8000")
     if "localhost" in site_url or "127.0.0.1" in site_url:
         try:
-            import socket
-            from urllib.parse import urlparse
-
             socket.gethostbyname("host.docker.internal")
             parsed_site = urlparse(site_url)
             port_part = f":{parsed_site.port}" if parsed_site.port else ""
-            return urljoin(f"http://host.docker.internal{port_part}", "/interpretation/voxbento/webhook/")
+            scheme = parsed_site.scheme or "http"
+            return urljoin(f"{scheme}://host.docker.internal{port_part}", "/interpretation/voxbento/webhook/")
         except Exception:
             pass
 
     return urljoin(site_url, "/interpretation/voxbento/webhook/")
 
 
-def subscribe_to_voxbento_webhooks(event: Event) -> None:
+def subscribe_to_voxbento_webhooks(event: Event, force: bool = False) -> None:
     """
     Subscribes Eventyay to VoxBento webhooks.
     Includes idempotency guards, DB concurrency locking, and failure reporting.
@@ -64,42 +50,21 @@ def subscribe_to_voxbento_webhooks(event: Event) -> None:
         # Lock the row for update to prevent concurrent subscriptions
         grant = grant.__class__.objects.select_for_update().get(pk=grant.pk)
 
+        # Skip if webhook subscription is already healthy and active
+        if grant.webhook_subscription_id and not grant.webhook_subscription_failed and not force:
+            logger.info(
+                "Webhook subscription %s already active for event %s. Skipping.",
+                grant.webhook_subscription_id,
+                event.id,
+            )
+            return
+
         base_url = get_voxbento_base_url(event)
         if not base_url:
             logger.warning("No base URL configured for VoxBento webhooks (Event %s)", event.id)
             return
 
         api_url = f"{base_url.rstrip('/')}/api/v1/webhooks"
-
-        # Idempotency Guard: Tear down existing subscription if any
-        if grant.webhook_subscription_id:
-            try:
-                access_token = get_valid_access_token(grant.id)
-                headers = {"Authorization": f"Bearer {access_token}"}
-                delete_url = f"{api_url}/{grant.webhook_subscription_id}"
-
-                resp = requests.delete(delete_url, headers=headers, timeout=5.0)
-
-                if resp.status_code == 404 or resp.status_code == 204:
-                    # Treat 404 as successful no-op (already gone)
-                    grant.webhook_subscription_id = None
-                    grant.save(update_fields=["webhook_subscription_id"])
-                else:
-                    resp.raise_for_status()
-                    # If it succeeded but returned something else (e.g. 200)
-                    grant.webhook_subscription_id = None
-                    grant.save(update_fields=["webhook_subscription_id"])
-            except Exception as e:
-                logger.error("Failed to delete existing VoxBento webhook %s: %s", grant.webhook_subscription_id, e)
-                # Re-raise to let Celery retry if the network failed
-                raise
-
-        # Now, create the new subscription
-        target_url = get_webhook_target_url()
-        payload = {
-            "target_url": target_url,
-            "event_types": ["booth.transcription.started", "booth.transcription.stopped", "booth.interpreter.joined"],
-        }
 
         access_token = get_valid_access_token(grant.id)
         if not access_token:
@@ -108,6 +73,15 @@ def subscribe_to_voxbento_webhooks(event: Event) -> None:
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
+        }
+
+        old_subscription_id = grant.webhook_subscription_id
+
+        # Create the new subscription first without removing the working target
+        target_url = get_webhook_target_url()
+        payload = {
+            "target_url": target_url,
+            "event_types": ["booth.transcription.started", "booth.transcription.stopped", "booth.interpreter.joined"],
         }
 
         resp = requests.post(api_url, headers=headers, json=payload, timeout=5.0)
@@ -143,6 +117,15 @@ def subscribe_to_voxbento_webhooks(event: Event) -> None:
                 "webhook_subscription_failed",
             ]
         )
+
+        # Delete superseded old subscription if replaced with a different ID
+        if old_subscription_id and str(old_subscription_id) != str(data["id"]):
+            try:
+                delete_url = f"{api_url}/{old_subscription_id}"
+                del_headers = {"Authorization": f"Bearer {access_token}"}
+                requests.delete(delete_url, headers=del_headers, timeout=5.0)
+            except Exception as e:
+                logger.warning("Failed to delete superseded VoxBento webhook %s: %s", old_subscription_id, e)
 
 
 def create_voxbento_event(event: Event) -> None:

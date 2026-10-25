@@ -96,7 +96,8 @@ def get_valid_access_token(grant_id):
             if not base_url:
                 raise VoxbentoReauthorizationRequired("VoxBento base URL is not configured")
 
-            initial_expires_at = grant.expires_at
+            initial_refresh_token = grant.refresh_token
+            initial_access_token = grant.access_token
             try:
                 new_tokens = call_voxbento_refresh(grant.refresh_token, base_url)
 
@@ -111,7 +112,10 @@ def get_valid_access_token(grant_id):
                     if not current_grant or current_grant.is_disconnected:
                         updated = 0
                         reauth_msg = "Integration disconnected during refresh network call"
-                    elif current_grant.expires_at != initial_expires_at:
+                    elif (
+                        current_grant.refresh_token != initial_refresh_token
+                        or current_grant.access_token != initial_access_token
+                    ):
                         # Another refresh or OAuth reauthorization updated credentials concurrently
                         updated = 0
                         reauth_msg = "Integration reconnected concurrently"
@@ -126,30 +130,26 @@ def get_valid_access_token(grant_id):
                         updated = 1
 
                 if updated == 0:
-                    # Best-effort revoke the newly issued token since we aren't saving it
-                    try:
-                        from eventyay.base.settings import GlobalSettingsObject
+                    if current_grant and current_grant.is_disconnected:
+                        # Best-effort revoke the newly issued token since the integration was disconnected
+                        try:
+                            from eventyay.base.settings import GlobalSettingsObject
 
-                        client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
-                        client_secret = GlobalSettingsObject().settings.get("voxbento_client_secret", "")
-                        if client_id:
-                            response = requests.post(
-                                f"{base_url.rstrip('/')}/oauth/revoke",
-                                data={
-                                    "token": new_tokens["access_token"],
-                                    "client_id": client_id,
-                                    "client_secret": client_secret,
-                                },
-                                timeout=(3.0, 5.0),
-                            )
-                            if not response.ok:
-                                import logging
-
-                                logging.getLogger(__name__).warning(
-                                    "VoxBento returned %s while revoking token after disconnect", response.status_code
+                            client_id = GlobalSettingsObject().settings.get("voxbento_client_id", "")
+                            client_secret = GlobalSettingsObject().settings.get("voxbento_client_secret", "")
+                            if client_id:
+                                requests.post(
+                                    f"{base_url.rstrip('/')}/oauth/revoke",
+                                    data={
+                                        "token": new_tokens["access_token"],
+                                        "client_id": client_id,
+                                        "client_secret": client_secret,
+                                    },
+                                    timeout=(3.0, 5.0),
                                 )
-                    except Exception:
-                        pass
+                        except Exception:
+                            pass
+                        raise VoxbentoReauthorizationRequired(reauth_msg)
 
                     # Re-check if grant was concurrently updated with valid tokens
                     latest_grant = type(grant).objects.filter(id=grant.id).first()
@@ -161,7 +161,7 @@ def get_valid_access_token(grant_id):
                     ):
                         return latest_grant.access_token
 
-                    raise VoxbentoReauthorizationRequired(reauth_msg)
+                    raise VoxbentoTemporarilyUnavailable(reauth_msg)
 
                 grant.access_token = new_tokens["access_token"]
                 grant.refresh_token = new_tokens["refresh_token"]

@@ -18,6 +18,25 @@ from .language_map import language_code_for_name
 logger = logging.getLogger(__name__)
 
 
+def _mark_connection_failure_flags(event_id: int) -> None:
+    try:
+        from .models import VoxbentoOAuthGrant
+
+        grant = VoxbentoOAuthGrant.objects.filter(event_id=event_id).first()
+        if grant:
+            update_fields = []
+            if not grant.event_provisioned:
+                grant.event_provisioning_failed = True
+                update_fields.append("event_provisioning_failed")
+            if not grant.webhook_subscription_id:
+                grant.webhook_subscription_failed = True
+                update_fields.append("webhook_subscription_failed")
+            if update_fields:
+                grant.save(update_fields=update_fields)
+    except Exception as err:
+        logger.error(f"Failed to update grant failure flags for event {event_id}: {err}")
+
+
 @shared_task(bind=True, max_retries=5, retry_backoff=True)
 def sync_voxbento_connection(self, event_id: int) -> None:
     """
@@ -63,12 +82,16 @@ def sync_voxbento_connection(self, event_id: int) -> None:
     except Event.DoesNotExist:
         logger.warning(f"Event {event_id} does not exist. Cannot sync VoxBento connection.")
         return
+    except MaxRetriesExceededError:
+        logger.error(f"Max retries exceeded syncing VoxBento connection for event {event_id}")
+        _mark_connection_failure_flags(event_id)
     except (requests.RequestException, redis.exceptions.LockError) as e:
         logger.warning(f"Transient error syncing VoxBento connection for event {event_id}: {e}")
         try:
             self.retry(exc=e)
         except MaxRetriesExceededError:
             logger.error(f"Max retries exceeded syncing VoxBento connection for event {event_id}")
+            _mark_connection_failure_flags(event_id)
 
 
 @shared_task(bind=True, max_retries=5, retry_backoff=True)
@@ -173,12 +196,7 @@ def _do_sync_single_room_to_voxbento(
             from django.db import transaction
 
             with transaction.atomic():
-                latest_interp = (
-                    type(interpretation)
-                    .objects.select_for_update()
-                    .filter(pk=interpretation.pk)
-                    .first()
-                )
+                latest_interp = type(interpretation).objects.select_for_update().filter(pk=interpretation.pk).first()
                 if latest_interp:
                     config = dict(latest_interp.backend_config) if latest_interp.backend_config else {}
                     config["voxbento_room_id"] = str(voxbento_room_id)

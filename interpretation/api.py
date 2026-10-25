@@ -53,6 +53,11 @@ class AttendeeVideoPermission(BasePermission):
             if "attendee" in traits:
                 return True
 
+        # Public video access permitted by event settings (permits anonymous attendees)
+        settings_obj = getattr(event, "settings", None)
+        if settings_obj and settings_obj.get("venueless_show_public_link", False):
+            return True
+
         # Check event-specific attendee or organizer access for authenticated users
         if getattr(request, "user", None) and request.user.is_authenticated:
             # Active staff / superuser session
@@ -64,13 +69,8 @@ class AttendeeVideoPermission(BasePermission):
             # Event organizer / team permission
             organizer = getattr(event, "organizer", None)
             if organizer and hasattr(request.user, "has_event_permission"):
-                if request.user.has_event_permission(organizer, event, request=request):
+                if request.user.has_event_permission(organizer, event, "can_change_event_settings", request=request):
                     return True
-
-            # Public video access permitted by event settings
-            settings_obj = getattr(event, "settings", None)
-            if settings_obj and settings_obj.get("venueless_show_public_link", False):
-                return True
 
             # Valid attendee ticket / order for this event
             try:
@@ -88,13 +88,16 @@ class AttendeeVideoPermission(BasePermission):
                 if getattr(getattr(event, "settings", None), "venueless_allow_pending", False):
                     allowed_statuses.append(Order.STATUS_PENDING)
 
-                if request.user.email and OrderPosition.objects.filter(
-                    order__event=event,
-                    order__email__iexact=request.user.email,
-                    order__status__in=allowed_statuses,
-                    canceled=False,
-                    addon_to__isnull=True,
-                ).exists():
+                if (
+                    request.user.email
+                    and OrderPosition.objects.filter(
+                        order__event=event,
+                        order__email__iexact=request.user.email,
+                        order__status__in=allowed_statuses,
+                        canceled=False,
+                        addon_to__isnull=True,
+                    ).exists()
+                ):
                     return True
             except Exception:
                 pass

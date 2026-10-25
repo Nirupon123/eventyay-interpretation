@@ -204,15 +204,23 @@ class InterpretationOverview(
 
             grant = getattr(request.event, "voxbento_oauth_grant", None)
             if grant and not grant.is_disconnected:
-                try:
-                    create_voxbento_event(request.event)
-                except Exception as e:
-                    logger.warning("Retry sync create_voxbento_event failed: %s", e)
+                if not grant.event_provisioned or grant.event_provisioning_failed:
+                    try:
+                        create_voxbento_event(request.event)
+                    except Exception as e:
+                        logger.warning("Retry sync create_voxbento_event failed: %s", e)
+                        grant.event_provisioning_failed = True
+                        grant.save(update_fields=["event_provisioning_failed"])
+                        messages.warning(request, _("VoxBento event provisioning failed: {e}").format(e=str(e)))
 
-                try:
-                    subscribe_to_voxbento_webhooks(request.event)
-                except Exception as e:
-                    logger.warning("Retry sync subscribe_to_voxbento_webhooks failed: %s", e)
+                if not grant.webhook_subscription_id or grant.webhook_subscription_failed:
+                    try:
+                        subscribe_to_voxbento_webhooks(request.event)
+                    except Exception as e:
+                        logger.warning("Retry sync subscribe_to_voxbento_webhooks failed: %s", e)
+                        grant.webhook_subscription_failed = True
+                        grant.save(update_fields=["webhook_subscription_failed"])
+                        messages.warning(request, _("VoxBento webhook setup failed: {e}").format(e=str(e)))
 
             backend = get_backend(RoomInterpretation.INTERPRETER_VOXBENTO)
             interpretations = RoomInterpretation.objects.filter(
