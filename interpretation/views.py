@@ -207,6 +207,9 @@ class InterpretationOverview(
                 if not grant.event_provisioned or grant.event_provisioning_failed:
                     try:
                         create_voxbento_event(request.event)
+                        grant.refresh_from_db()
+                        if not grant.event_provisioned or grant.event_provisioning_failed:
+                            raise RuntimeError(_("VoxBento event provisioning did not complete"))
                     except Exception as e:
                         logger.warning("Retry sync create_voxbento_event failed: %s", e)
                         grant.event_provisioning_failed = True
@@ -216,6 +219,11 @@ class InterpretationOverview(
                 if not grant.webhook_subscription_id or grant.webhook_subscription_failed:
                     try:
                         subscribe_to_voxbento_webhooks(request.event)
+                        grant.refresh_from_db()
+                        if (
+                            not grant.webhook_subscription_id and not grant.webhook_scope_denied
+                        ) or grant.webhook_subscription_failed:
+                            raise RuntimeError(_("VoxBento webhook setup did not complete"))
                     except Exception as e:
                         logger.warning("Retry sync subscribe_to_voxbento_webhooks failed: %s", e)
                         grant.webhook_subscription_failed = True

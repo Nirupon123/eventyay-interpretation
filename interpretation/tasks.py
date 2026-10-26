@@ -77,8 +77,9 @@ def sync_voxbento_connection(self, event_id: int) -> None:
 
         # Reload grant to ensure we have latest flags
         grant.refresh_from_db()
-        if grant.event_provisioning_failed:
+        if not grant.event_provisioned or grant.event_provisioning_failed:
             logger.error(f"Event provisioning failed for event {event_id}. Halting task chain.")
+            _mark_connection_failure_flags(event_id)
             return
 
         # Subscribe Webhooks
@@ -99,6 +100,13 @@ def sync_voxbento_connection(self, event_id: int) -> None:
                 )
             else:
                 _retry_connection(self, e, event_id)
+
+        # Reload grant to ensure we have latest webhook flags
+        grant.refresh_from_db()
+        if (not grant.webhook_subscription_id and not grant.webhook_scope_denied) or grant.webhook_subscription_failed:
+            logger.error(f"Webhook subscription failed for event {event_id}. Halting task chain.")
+            _mark_connection_failure_flags(event_id)
+            return
 
         # Bulk Sync Rooms
         sync_all_rooms_to_voxbento.delay(event_id)
