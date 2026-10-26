@@ -69,7 +69,8 @@ class AttendeeVideoPermission(BasePermission):
             # Event organizer / team permission
             organizer = getattr(event, "organizer", None)
             if organizer and hasattr(request.user, "has_event_permission"):
-                if request.user.has_event_permission(organizer, event, "can_change_event_settings", request=request):
+                req_arg = request if getattr(request, "session", None) is not None else None
+                if request.user.has_event_permission(organizer, event, "can_change_event_settings", request=req_arg):
                     return True
 
             # Valid attendee ticket / order for this event
@@ -78,28 +79,7 @@ class AttendeeVideoPermission(BasePermission):
 
                 if user_has_valid_ticket({"request": request}, event):
                     return True
-            except Exception:
-                pass
-
-            try:
-                from eventyay.base.models import Order, OrderPosition
-
-                allowed_statuses = [Order.STATUS_PAID]
-                if getattr(getattr(event, "settings", None), "venueless_allow_pending", False):
-                    allowed_statuses.append(Order.STATUS_PENDING)
-
-                if (
-                    request.user.email
-                    and OrderPosition.objects.filter(
-                        order__event=event,
-                        order__email__iexact=request.user.email,
-                        order__status__in=allowed_statuses,
-                        canceled=False,
-                        addon_to__isnull=True,
-                    ).exists()
-                ):
-                    return True
-            except Exception:
+            except ImportError:
                 pass
 
         return EventPermission().has_permission(request, view)

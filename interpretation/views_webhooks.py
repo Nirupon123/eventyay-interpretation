@@ -126,9 +126,12 @@ class VoxbentoWebhookReceiverView(View):
 
         # 3. If room mapping is missing (e.g. interrupted sync), trigger async reconciliation
         try:
+            from django.core.cache import cache
+
             from .tasks import sync_all_rooms_to_voxbento
 
-            sync_all_rooms_to_voxbento.delay(event.id)
+            if cache.add(f"voxbento-resync:{event.id}", 1, 60):
+                sync_all_rooms_to_voxbento.delay(event.id)
         except Exception:
             pass
 

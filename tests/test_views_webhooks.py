@@ -103,3 +103,26 @@ def test_webhook_views_import_notify_from_a_module_that_defines_it():
     for node in imports:
         module = importlib.import_module("." * node.level + (node.module or ""), package="interpretation")
         assert hasattr(module, "notify_video_room_config_changed"), module.__name__
+
+
+def test_webhook_room_resync_rate_limiting(event):
+    from unittest.mock import patch
+
+    from django.core.cache import cache
+
+    from interpretation.views_webhooks import VoxbentoWebhookReceiverView
+
+    cache.clear()
+    view = VoxbentoWebhookReceiverView()
+
+    with patch("interpretation.tasks.sync_all_rooms_to_voxbento.delay") as mock_sync:
+        # First unknown booth ID -> triggers sync task
+        room1 = view._get_room_from_booth_id(event, f"{event.slug}-99999-en")
+        assert room1 is None
+        assert mock_sync.call_count == 1
+        assert mock_sync.call_args[0] == (event.id,)
+
+        # Second unknown booth ID within 60s cache window -> cached, does NOT trigger sync task again
+        room2 = view._get_room_from_booth_id(event, f"{event.slug}-99999-en")
+        assert room2 is None
+        assert mock_sync.call_count == 1
