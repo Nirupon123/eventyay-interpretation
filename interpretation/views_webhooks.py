@@ -103,11 +103,39 @@ class VoxbentoWebhookReceiverView(View):
         if len(parts) != 3:
             return None
 
+        v_room_ref = parts[1]
+        # 1. First check if any room in this event matches VoxBento's room ID
+        room = Room.objects.filter(
+            event=event,
+            interpretation__backend_config__voxbento_room_id=v_room_ref,
+        ).first()
+        if not room:
+            room = Room.objects.filter(
+                event=event,
+                interpretation__backend_session_id=v_room_ref,
+            ).first()
+        if room:
+            return room
+
+        # 2. Fallback to Eventyay's internal room database ID
         try:
-            room_id = int(parts[1])
+            room_id = int(v_room_ref)
             return Room.objects.get(id=room_id, event=event)
         except (ValueError, Room.DoesNotExist):
-            return None
+            pass
+
+        # 3. If room mapping is missing (e.g. interrupted sync), trigger async reconciliation
+        try:
+            from django.core.cache import cache
+
+            from .tasks import sync_all_rooms_to_voxbento
+
+            if cache.add(f"voxbento-resync:{event.id}", 1, 60):
+                sync_all_rooms_to_voxbento.delay(event.id)
+        except Exception:
+            pass
+
+        return None
 
     def handle_transcription_started(self, event, data):
         room = self._get_room_from_booth_id(event, data.get("booth_id"))
@@ -120,9 +148,23 @@ class VoxbentoWebhookReceiverView(View):
 
         with transaction.atomic():
             interp = RoomInterpretation.objects.select_for_update().get(id=room.interpretation.id)
-        interp.status = interp.STATUS_RUNNING
-        interp.backend_session_id = data.get("session_id", "")
-        interp.save(update_fields=["status", "backend_session_id"])
+            interp.status = interp.STATUS_RUNNING
+            session_id = data.get("session_id", "")
+            update_fields = ["status"]
+
+            # Only set backend_session_id if it's currently unset.
+            # Do not overwrite an existing numeric VoxBento room ID with worker UUID.
+            if not interp.backend_session_id and session_id:
+                interp.backend_session_id = session_id
+                update_fields.append("backend_session_id")
+
+            if session_id:
+                config = dict(interp.backend_config) if interp.backend_config else {}
+                config["transcription_session_id"] = session_id
+                interp.backend_config = config
+                update_fields.append("backend_config")
+
+            interp.save(update_fields=update_fields)
 
         from .room_control import notify_video_room_config_changed
 
@@ -139,28 +181,43 @@ class VoxbentoWebhookReceiverView(View):
 
         with transaction.atomic():
             interp = RoomInterpretation.objects.select_for_update().get(id=room.interpretation.id)
-        interp.status = interp.STATUS_IDLE
-        interp.backend_session_id = ""
+            interp.status = interp.STATUS_IDLE
+            update_fields = ["status"]
 
-        error_code = data.get("error_code")
-        error_detail = data.get("error_detail")
-        if error_code:
-            logger.error("VoxBento session crashed for room %s: %s (%s)", room.id, error_detail, error_code)
+            # Only clear backend_session_id if it's not a numeric VoxBento room ID
+            is_numeric_room = (
+                interp.interpreter == RoomInterpretation.INTERPRETER_VOXBENTO and interp.backend_session_id.isdigit()
+            )
+            if not is_numeric_room:
+                interp.backend_session_id = ""
+                update_fields.append("backend_session_id")
+
             config = dict(interp.backend_config) if interp.backend_config else {}
-            config["last_error"] = error_detail or error_code
-            config["last_error_code"] = error_code
-            interp.backend_config = config
-            interp.save(update_fields=["status", "backend_session_id", "backend_config"])
-        else:
-            # Clear previous errors on normal shutdown
-            if interp.backend_config and "last_error" in interp.backend_config:
-                config = dict(interp.backend_config)
-                config.pop("last_error", None)
-                config.pop("last_error_code", None)
-                interp.backend_config = config
-                interp.save(update_fields=["status", "backend_session_id", "backend_config"])
+            if "transcription_session_id" in config:
+                config.pop("transcription_session_id", None)
+                if "backend_config" not in update_fields:
+                    update_fields.append("backend_config")
+
+            error_code = data.get("error_code")
+            error_detail = data.get("error_detail")
+            if error_code:
+                logger.error("VoxBento session crashed for room %s: %s (%s)", room.id, error_detail, error_code)
+                config["last_error"] = error_detail or error_code
+                config["last_error_code"] = error_code
+                if "backend_config" not in update_fields:
+                    update_fields.append("backend_config")
             else:
-                interp.save(update_fields=["status", "backend_session_id"])
+                # Clear previous errors on normal shutdown
+                if "last_error" in config:
+                    config.pop("last_error", None)
+                    config.pop("last_error_code", None)
+                    if "backend_config" not in update_fields:
+                        update_fields.append("backend_config")
+
+            if "backend_config" in update_fields:
+                interp.backend_config = config
+
+            interp.save(update_fields=update_fields)
 
         from .room_control import notify_video_room_config_changed
 

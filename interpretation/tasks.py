@@ -18,6 +18,39 @@ from .language_map import language_code_for_name
 logger = logging.getLogger(__name__)
 
 
+def _mark_connection_failure_flags(event_id: int) -> None:
+    try:
+        from .models import VoxbentoOAuthGrant
+
+        grant = VoxbentoOAuthGrant.objects.filter(event_id=event_id).first()
+        if grant:
+            update_fields = []
+            if not grant.event_provisioned:
+                grant.event_provisioning_failed = True
+                update_fields.append("event_provisioning_failed")
+            if not grant.webhook_subscription_id:
+                grant.webhook_subscription_failed = True
+                update_fields.append("webhook_subscription_failed")
+            if update_fields:
+                grant.save(update_fields=update_fields)
+    except Exception as err:
+        logger.error(f"Failed to update grant failure flags for event {event_id}: {err}")
+
+
+def _retry_connection(task, exc: Exception, event_id: int) -> None:
+    """Retry task with backoff; on exhaustion mark failure flags and re-raise."""
+    if task.request.retries >= task.max_retries:
+        logger.error(f"Max retries exceeded syncing VoxBento connection for event {event_id}: {exc}")
+        _mark_connection_failure_flags(event_id)
+        raise exc
+    try:
+        task.retry(exc=exc)
+    except (MaxRetriesExceededError, requests.RequestException, redis.exceptions.LockError):
+        logger.error(f"Max retries exceeded syncing VoxBento connection for event {event_id}: {exc}")
+        _mark_connection_failure_flags(event_id)
+        raise
+
+
 @shared_task(bind=True, max_retries=5, retry_backoff=True)
 def sync_voxbento_connection(self, event_id: int) -> None:
     """
@@ -33,21 +66,32 @@ def sync_voxbento_connection(self, event_id: int) -> None:
         try:
             create_voxbento_event(event)
         except requests.RequestException as e:
-            if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code < 500:
+            if (
+                isinstance(e, requests.HTTPError)
+                and e.response is not None
+                and e.response.status_code < 500
+                and e.response.status_code not in (408, 429)
+            ):
                 raise
-            self.retry(exc=e)
+            _retry_connection(self, e, event_id)
 
         # Reload grant to ensure we have latest flags
         grant.refresh_from_db()
-        if grant.event_provisioning_failed:
+        if not grant.event_provisioned or grant.event_provisioning_failed:
             logger.error(f"Event provisioning failed for event {event_id}. Halting task chain.")
+            _mark_connection_failure_flags(event_id)
             return
 
         # Subscribe Webhooks
         try:
             subscribe_to_voxbento_webhooks(event)
         except requests.RequestException as e:
-            if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code < 500:
+            if (
+                isinstance(e, requests.HTTPError)
+                and e.response is not None
+                and e.response.status_code < 500
+                and e.response.status_code not in (408, 429)
+            ):
                 logger.error(f"VoxBento webhook failed {e.response.status_code}: {e.response.text}")
                 from .models import VoxbentoOAuthGrant
 
@@ -55,7 +99,14 @@ def sync_voxbento_connection(self, event_id: int) -> None:
                     webhook_subscription_failed=True
                 )
             else:
-                self.retry(exc=e)
+                _retry_connection(self, e, event_id)
+
+        # Reload grant to ensure we have latest webhook flags
+        grant.refresh_from_db()
+        if (not grant.webhook_subscription_id and not grant.webhook_scope_denied) or grant.webhook_subscription_failed:
+            logger.error(f"Webhook subscription failed for event {event_id}. Halting task chain.")
+            _mark_connection_failure_flags(event_id)
+            return
 
         # Bulk Sync Rooms
         sync_all_rooms_to_voxbento.delay(event_id)
@@ -63,12 +114,12 @@ def sync_voxbento_connection(self, event_id: int) -> None:
     except Event.DoesNotExist:
         logger.warning(f"Event {event_id} does not exist. Cannot sync VoxBento connection.")
         return
+    except MaxRetriesExceededError:
+        logger.error(f"Max retries exceeded syncing VoxBento connection for event {event_id}")
+        _mark_connection_failure_flags(event_id)
     except (requests.RequestException, redis.exceptions.LockError) as e:
         logger.warning(f"Transient error syncing VoxBento connection for event {event_id}: {e}")
-        try:
-            self.retry(exc=e)
-        except MaxRetriesExceededError:
-            logger.error(f"Max retries exceeded syncing VoxBento connection for event {event_id}")
+        _retry_connection(self, e, event_id)
 
 
 @shared_task(bind=True, max_retries=5, retry_backoff=True)
@@ -170,8 +221,18 @@ def _do_sync_single_room_to_voxbento(
             and interpretation
             and interpretation.interpreter == RoomInterpretation.INTERPRETER_VOXBENTO
         ):
-            # Use update() to avoid triggering post_save signals which cause RecursionError
-            type(interpretation).objects.filter(pk=interpretation.pk).update(backend_session_id=str(voxbento_room_id))
+            from django.db import transaction
+
+            with transaction.atomic():
+                latest_interp = type(interpretation).objects.select_for_update().filter(pk=interpretation.pk).first()
+                if latest_interp:
+                    config = dict(latest_interp.backend_config) if latest_interp.backend_config else {}
+                    config["voxbento_room_id"] = str(voxbento_room_id)
+                    # Use update() to avoid triggering post_save signals which cause RecursionError
+                    type(interpretation).objects.filter(pk=interpretation.pk).update(
+                        backend_session_id=str(voxbento_room_id),
+                        backend_config=config,
+                    )
 
         if response_data.get("error") == 409:
             # We got a 409, meaning an active session was found.

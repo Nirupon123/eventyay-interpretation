@@ -158,8 +158,12 @@ def attendee_language_streams(stored_streams: list | None, event=None, room=None
 
             # Use the VoxBento room ID if we have it saved, otherwise fallback to Eventyay's room ID
             v_room_id = str(room.id)
-            if hasattr(room, "interpretation") and room.interpretation.backend_session_id:
-                v_room_id = room.interpretation.backend_session_id
+            if hasattr(room, "interpretation") and room.interpretation:
+                interp = room.interpretation
+                if interp.backend_config and interp.backend_config.get("voxbento_room_id"):
+                    v_room_id = str(interp.backend_config["voxbento_room_id"])
+                elif interp.backend_session_id and interp.backend_session_id.isdigit():
+                    v_room_id = interp.backend_session_id
 
             for entry in normalized:
                 if entry["language"] == ORIGINAL_LANGUAGE:

@@ -1,3 +1,5 @@
+import logging
+
 from csp.decorators import csp_update
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
@@ -34,6 +36,8 @@ from .room_control import (
 )
 
 PLUGIN_MODULE = "interpretation"
+
+logger = logging.getLogger(__name__)
 
 
 def _notify_stop_result(request, room, result) -> None:
@@ -194,8 +198,37 @@ class InterpretationOverview(
 
         if request.POST.get("action") == "sync_all_rooms":
             from .backends.registry import get_backend
+            from .backends.voxbento_api import create_voxbento_event, subscribe_to_voxbento_webhooks
             from .backends.voxbento_oauth import VoxbentoTemporarilyUnavailable
             from .models import RoomInterpretation
+
+            grant = getattr(request.event, "voxbento_oauth_grant", None)
+            if grant and not grant.is_disconnected:
+                if not grant.event_provisioned or grant.event_provisioning_failed:
+                    try:
+                        create_voxbento_event(request.event)
+                        grant.refresh_from_db()
+                        if not grant.event_provisioned or grant.event_provisioning_failed:
+                            raise RuntimeError(_("VoxBento event provisioning did not complete"))
+                    except Exception as e:
+                        logger.warning("Retry sync create_voxbento_event failed: %s", e)
+                        grant.event_provisioning_failed = True
+                        grant.save(update_fields=["event_provisioning_failed"])
+                        messages.warning(request, _("VoxBento event provisioning failed: {e}").format(e=str(e)))
+
+                if not grant.webhook_subscription_id or grant.webhook_subscription_failed:
+                    try:
+                        subscribe_to_voxbento_webhooks(request.event)
+                        grant.refresh_from_db()
+                        if (
+                            not grant.webhook_subscription_id and not grant.webhook_scope_denied
+                        ) or grant.webhook_subscription_failed:
+                            raise RuntimeError(_("VoxBento webhook setup did not complete"))
+                    except Exception as e:
+                        logger.warning("Retry sync subscribe_to_voxbento_webhooks failed: %s", e)
+                        grant.webhook_subscription_failed = True
+                        grant.save(update_fields=["webhook_subscription_failed"])
+                        messages.warning(request, _("VoxBento webhook setup failed: {e}").format(e=str(e)))
 
             backend = get_backend(RoomInterpretation.INTERPRETER_VOXBENTO)
             interpretations = RoomInterpretation.objects.filter(

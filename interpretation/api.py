@@ -53,6 +53,35 @@ class AttendeeVideoPermission(BasePermission):
             if "attendee" in traits:
                 return True
 
+        # Public video access permitted by event settings (permits anonymous attendees)
+        settings_obj = getattr(event, "settings", None)
+        if settings_obj and settings_obj.get("venueless_show_public_link", False):
+            return True
+
+        # Check event-specific attendee or organizer access for authenticated users
+        if getattr(request, "user", None) and request.user.is_authenticated:
+            # Active staff / superuser session
+            if hasattr(request.user, "has_active_staff_session"):
+                session_key = getattr(getattr(request, "session", None), "session_key", None)
+                if session_key and request.user.has_active_staff_session(session_key):
+                    return True
+
+            # Event organizer / team permission
+            organizer = getattr(event, "organizer", None)
+            if organizer and hasattr(request.user, "has_event_permission"):
+                req_arg = request if getattr(request, "session", None) is not None else None
+                if request.user.has_event_permission(organizer, event, "can_change_event_settings", request=req_arg):
+                    return True
+
+            # Valid attendee ticket / order for this event
+            try:
+                from eventyay.common.templatetags.event_tags import user_has_valid_ticket
+
+                if user_has_valid_ticket({"request": request}, event):
+                    return True
+            except ImportError:
+                pass
+
         return EventPermission().has_permission(request, view)
 
 
@@ -234,7 +263,15 @@ class RoomInterpretationViewSet(PretalxViewSetMixin, viewsets.ViewSet):
     def listener_token(self, request, room_pk=None, **kwargs):
         room = self._ensure_room()
 
-        oauth_path = f"api/v1/events/{self.event.slug}/rooms/{room.pk}/listener-token"
+        v_room_id = str(room.pk)
+        if hasattr(room, "interpretation") and room.interpretation:
+            interp = room.interpretation
+            if interp.backend_config and interp.backend_config.get("voxbento_room_id"):
+                v_room_id = str(interp.backend_config["voxbento_room_id"])
+            elif interp.backend_session_id and interp.backend_session_id.isdigit():
+                v_room_id = interp.backend_session_id
+
+        oauth_path = f"api/v1/events/{self.event.slug}/rooms/{v_room_id}/listener-token"
         legacy_path = "api/v1/tokens/listener"
 
         payload = {"event_slug": self.event.slug}
