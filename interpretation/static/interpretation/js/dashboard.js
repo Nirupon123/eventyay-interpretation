@@ -42,11 +42,14 @@ document.addEventListener('click', function (e) {
     if (link) {
         e.preventDefault();
         e.stopPropagation();
-        openVoxbentoPopup(
+        const popup = openVoxbentoPopup(
             link.href,
             link.getAttribute('data-popup-width'),
             link.getAttribute('data-popup-height')
         );
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+            window.location.href = link.href;
+        }
         return false;
     }
 }, true);
@@ -56,11 +59,14 @@ if (typeof $ !== 'undefined') {
     $(document).on('click', '.js-voxbento-popup', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        openVoxbentoPopup(
+        const popup = openVoxbentoPopup(
             this.href,
             this.getAttribute('data-popup-width'),
             this.getAttribute('data-popup-height')
         );
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+            window.location.href = this.href;
+        }
         return false;
     });
 }

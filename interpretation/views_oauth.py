@@ -224,7 +224,6 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
 
         old_access_token = None
         old_webhook_id = None
-        exchange_error = None
 
         try:
             resp = requests.post(
@@ -302,14 +301,13 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
                     logger.warning(f"Failed to delete old webhook during reconnect for event {event.slug}: {e}")
 
         except Exception as e:
-            exchange_error = str(e)
-            messages.error(request, _("Failed to exchange OAuth token: ") + exchange_error)
-
-        if exchange_error:
+            err_msg = str(e) or e.__class__.__name__
+            full_msg = _("Failed to exchange OAuth token: ") + err_msg
+            messages.error(request, full_msg)
             return self._popup_response(
                 dashboard_url,
                 success=False,
-                error_message=_("Failed to exchange OAuth token: ") + exchange_error,
+                error_message=full_msg,
             )
 
         return self._popup_response(dashboard_url, success=True)
