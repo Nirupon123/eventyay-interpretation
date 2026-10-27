@@ -1,0 +1,107 @@
+{% load i18n static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% trans "VoxBento Authentication" %}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .card {
+            background: #ffffff;
+            padding: 36px 28px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            max-width: 440px;
+            width: 100%;
+        }
+        .icon-circle {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        .icon-success {
+            background-color: #ecfdf5;
+            color: #10b981;
+        }
+        .icon-error {
+            background-color: #fef2f2;
+            color: #ef4444;
+        }
+        h3 {
+            margin: 0 0 10px;
+            font-size: 19px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        p {
+            margin: 0 0 24px;
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #ffffff;
+            background-color: #0284c7;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #0369a1;
+        }
+        .fallback-link {
+            display: block;
+            margin-top: 18px;
+            font-size: 13px;
+            color: #64748b;
+            text-decoration: underline;
+        }
+        .fallback-link:hover {
+            color: #0f172a;
+        }
+    </style>
+</head>
+<body id="oauth-callback-body" data-redirect-url="{{ redirect_url }}" data-success="{% if success %}true{% else %}false{% endif %}">
+    <div class="card">
+        {% if success %}
+            <div class="icon-circle icon-success">✓</div>
+            <h3>{% trans "Connected to VoxBento" %}</h3>
+            <p>{% trans "Authentication was successful! You can close this window now." %}</p>
+        {% else %}
+            <div class="icon-circle icon-error">✕</div>
+            <h3>{% trans "Connection Failed" %}</h3>
+            <p>{{ error_message|default:_("Authentication could not be completed.") }}</p>
+        {% endif %}
+        <button type="button" class="btn" id="btn-close-window">{% trans "Close Window" %}</button>
+        <a href="{{ redirect_url }}" class="fallback-link" id="link-fallback">
+            {% trans "Click here to return to Eventyay" %}
+        </a>
+    </div>
+    <script src="{% static 'interpretation/js/oauth_callback.js' %}"></script>
+</body>
+</html>

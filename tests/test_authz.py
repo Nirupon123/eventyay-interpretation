@@ -295,3 +295,95 @@ def test_client_listener_token_admission_permission(client, event, user):
         response = client.post(url)
         assert response.status_code == 200
         assert response.json() == {"token": "mock-token"}
+
+
+def test_dashboard_csp_headers(organizer_client, dashboard_url):
+    import re
+
+    response = organizer_client.get(dashboard_url)
+    assert response.status_code == 200
+
+    # 1. X-Frame-Options must be SAMEORIGIN
+    assert response["X-Frame-Options"] == "SAMEORIGIN"
+
+    # 2. If Content-Security-Policy is present, check for validity
+    csp = response.get("Content-Security-Policy", "")
+    if csp:
+        # Check no invalid uppercase or underscore directives
+        assert "SCRIPT_SRC" not in csp
+        assert "FRAME_ANCESTORS" not in csp
+
+        # All directive names must contain only lowercase alphanumeric and dashes
+        directives = [part.strip().split()[0] for part in csp.split(";") if part.strip()]
+        for d in directives:
+            assert re.match(r"^[a-z0-9-]+$", d), f"Invalid CSP directive name: {d}"
+
+        # frame-ancestors must be included
+        assert "frame-ancestors" in directives
+
+    # 3. Check response._csp_update has no invalid keys
+    csp_update = getattr(response, "_csp_update", {})
+    if csp_update:
+        assert "SCRIPT_SRC" not in csp_update
+        assert "FRAME_ANCESTORS" not in csp_update
+        for k in csp_update.keys():
+            assert re.match(r"^[a-z0-9-]+$", k), f"Invalid directive key in _csp_update: {k}"
+
+
+def test_oauth_connect_unconfigured_renders_popup_error_no_dashboard_redirect(organizer_client, event):
+    from django.urls import reverse
+    from eventyay.base.settings import GlobalSettingsObject
+
+    gs = GlobalSettingsObject()
+    gs.settings.set("voxbento_client_id", "")
+    gs.settings.set("voxbento_base_url", "")
+
+    url = reverse(
+        "plugins:interpretation:oauth_connect",
+        kwargs={"organizer": event.organizer.slug, "event": event.slug},
+    )
+
+    response = organizer_client.get(url)
+    # Must NOT redirect to dashboard_url (which would load the full Eventyay site in a 600x700 popup)
+    assert response.status_code == 200
+    assert "interpretation/oauth_error.html" in [t.name for t in response.templates if t.name]
+    content = response.content.decode("utf-8")
+    assert "VoxBento Setup Required" in content
+    assert "Please configure the VoxBento Client ID" in content
+    # Must include external script and no inline onclick
+    assert "oauth_callback.js" in content
+    assert "onclick=" not in content
+
+
+def test_oauth_callback_popup_response_csp_safe(organizer_client, event):
+    from django.urls import reverse
+
+    url = reverse("plugins:interpretation:oauth_callback")
+    # Missing state -> returns error popup response
+    response = organizer_client.get(url)
+    assert response.status_code == 200
+    assert "interpretation/oauth_callback.html" in [t.name for t in response.templates if t.name]
+    content = response.content.decode("utf-8")
+    # Must NOT contain inline <script> tags or inline onclick handlers
+    assert "<script>" not in content
+    assert "onclick=" not in content
+    assert "oauth_callback.js" in content
+    # Check CSP update frame-ancestors 'self'
+    assert response._csp_update.get("frame-ancestors") == ["'self'"]
+
+
+def test_dashboard_no_inline_scripts_or_handlers(organizer_client, dashboard_url):
+    import re
+
+    response = organizer_client.get(dashboard_url)
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+
+    # Connect buttons must use js-voxbento-popup class and not inline onclick
+    assert (
+        'class="btn btn-primary js-voxbento-popup"' in content or 'class="btn btn-default js-voxbento-popup"' in content
+    )
+    assert 'onclick="window.open' not in content
+
+    # Check for forbidden inline event handlers on any element
+    assert not re.search(r'\bon[a-z]+\s*=\s*"[^"]*window\.open', content)
