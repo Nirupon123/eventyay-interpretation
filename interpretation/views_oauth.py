@@ -90,7 +90,7 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
         verifier, challenge = generate_pkce()
 
         state = f"{event.slug}::{secrets.token_urlsafe(16)}"
-        request.session[f"voxbento_oauth_state:{event.slug}"] = {
+        request.session[f"voxbento_oauth_state:{state}"] = {
             "state": state,
             "code_verifier": verifier,
             "timestamp": time.time(),
@@ -148,7 +148,13 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             messages.error(request, msg)
             return self._popup_response(reverse("control:index"), success=False, error_message=msg)
 
-        dashboard_url = f"/video/event/{event.organizer.slug}/{event.slug}/event/interpretation/"
+        try:
+            dashboard_url = reverse(
+                "plugins:interpretation:dashboard",
+                kwargs={"organizer": event.organizer.slug, "event": event.slug},
+            )
+        except Exception:
+            dashboard_url = f"/video/event/{event.organizer.slug}/{event.slug}/event/interpretation/"
 
         error = request.GET.get("error")
         error_description = request.GET.get("error_description", "")
@@ -167,7 +173,10 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             messages.error(request, msg)
             return self._popup_response(dashboard_url, success=False, error_message=msg)
 
-        session_data = request.session.pop(f"voxbento_oauth_state:{event.slug}", None)
+        session_data = request.session.pop(f"voxbento_oauth_state:{state}", None)
+        if not session_data:
+            # Fallback for any in-flight attempts using legacy event-scoped key
+            session_data = request.session.pop(f"voxbento_oauth_state:{event.slug}", None)
 
         if not session_data:
             msg = _("OAuth authorization failed: Session expired or already consumed.")

@@ -1,10 +1,17 @@
 if (typeof BroadcastChannel !== 'undefined') {
-    const bc = new BroadcastChannel('oauth_channel');
-    bc.onmessage = function (event) {
+    const handleOAuthComplete = function (event) {
         if (event.data === 'oauth_complete') {
             window.location.reload();
         }
     };
+    try {
+        const bcPrimary = new BroadcastChannel('voxbento_oauth');
+        bcPrimary.onmessage = handleOAuthComplete;
+    } catch (e) {}
+    try {
+        const bcLegacy = new BroadcastChannel('oauth_channel');
+        bcLegacy.onmessage = handleOAuthComplete;
+    } catch (e) {}
 }
 
 window.addEventListener('message', function (event) {

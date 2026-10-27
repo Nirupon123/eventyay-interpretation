@@ -306,8 +306,12 @@ def test_dashboard_csp_headers(organizer_client, dashboard_url):
     # 1. X-Frame-Options must be SAMEORIGIN
     assert response["X-Frame-Options"] == "SAMEORIGIN"
 
-    # 2. If Content-Security-Policy is present, check for validity
+    # 2. Content-Security-Policy header or _csp_update must be present and enforce frame-ancestors
     csp = response.get("Content-Security-Policy", "")
+    csp_update = getattr(response, "_csp_update", {})
+    assert csp or csp_update, "Expected either Content-Security-Policy header or _csp_update on dashboard response"
+
+    has_frame_ancestors = False
     if csp:
         # Check no invalid uppercase or underscore directives
         assert "SCRIPT_SRC" not in csp
@@ -318,16 +322,19 @@ def test_dashboard_csp_headers(organizer_client, dashboard_url):
         for d in directives:
             assert re.match(r"^[a-z0-9-]+$", d), f"Invalid CSP directive name: {d}"
 
-        # frame-ancestors must be included
-        assert "frame-ancestors" in directives
+        if "frame-ancestors" in directives:
+            has_frame_ancestors = True
 
-    # 3. Check response._csp_update has no invalid keys
-    csp_update = getattr(response, "_csp_update", {})
+    # 3. Check response._csp_update has no invalid keys and includes frame-ancestors
     if csp_update:
         assert "SCRIPT_SRC" not in csp_update
         assert "FRAME_ANCESTORS" not in csp_update
         for k in csp_update.keys():
             assert re.match(r"^[a-z0-9-]+$", k), f"Invalid directive key in _csp_update: {k}"
+        if "frame-ancestors" in csp_update:
+            has_frame_ancestors = True
+
+    assert has_frame_ancestors, "Expected 'frame-ancestors' protection in CSP header or _csp_update"
 
 
 def test_oauth_connect_unconfigured_renders_popup_error_no_dashboard_redirect(organizer_client, event):
@@ -387,3 +394,40 @@ def test_dashboard_no_inline_scripts_or_handlers(organizer_client, dashboard_url
 
     # Check for forbidden inline event handlers on any element
     assert not re.search(r'\bon[a-z]+\s*=\s*"[^"]*window\.open', content)
+
+
+def test_oauth_overlapping_attempts_do_not_overwrite_state(organizer_client, event):
+    from urllib.parse import parse_qs, urlparse
+
+    from django.urls import reverse
+    from eventyay.base.settings import GlobalSettingsObject
+
+    gs = GlobalSettingsObject()
+    gs.settings.set("voxbento_client_id", "test_client_id")
+    gs.settings.set("voxbento_base_url", "https://voxbento.example.com")
+
+    url = reverse(
+        "plugins:interpretation:oauth_connect",
+        kwargs={"organizer": event.organizer.slug, "event": event.slug},
+    )
+
+    # Attempt 1
+    resp1 = organizer_client.get(url)
+    assert resp1.status_code == 302
+    qs1 = parse_qs(urlparse(resp1["Location"]).query)
+    state1 = qs1["state"][0]
+
+    # Attempt 2 (overlapping in another tab/popup)
+    resp2 = organizer_client.get(url)
+    assert resp2.status_code == 302
+    qs2 = parse_qs(urlparse(resp2["Location"]).query)
+    state2 = qs2["state"][0]
+
+    assert state1 != state2
+
+    # Verify both distinct state entries exist simultaneously in session
+    session = organizer_client.session
+    assert f"voxbento_oauth_state:{state1}" in session
+    assert f"voxbento_oauth_state:{state2}" in session
+    assert session[f"voxbento_oauth_state:{state1}"]["state"] == state1
+    assert session[f"voxbento_oauth_state:{state2}"]["state"] == state2
