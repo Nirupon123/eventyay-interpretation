@@ -92,6 +92,7 @@ class VoxbentoOAuthConnectView(EventPermissionRequiredMixin, View):
         state = f"{event.slug}::{secrets.token_urlsafe(16)}"
         request.session[f"voxbento_oauth_state:{state}"] = {
             "state": state,
+            "event_id": event.pk,
             "code_verifier": verifier,
             "timestamp": time.time(),
         }
@@ -139,12 +140,28 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             messages.error(request, msg)
             return self._popup_response(reverse("control:index"), success=False, error_message=msg)
 
-        event_slug, original_state = state.split("::", 1)
+        # Resolve identity only from a validated, single-use server-side attempt.
+        # Attempts started before event_id was stored must restart authorization.
+        session_data = request.session.pop(f"voxbento_oauth_state:{state}", None)
+        if not session_data or not session_data.get("event_id"):
+            msg = _("OAuth authorization failed: Session expired or already consumed. Please connect again.")
+            messages.error(request, msg)
+            return self._popup_response(reverse("control:index"), success=False, error_message=msg)
+
+        if session_data.get("state") != state or time.time() - session_data.get("timestamp", 0) > 600:
+            msg = _("OAuth authorization failed: Invalid or expired state.")
+            messages.error(request, msg)
+            return self._popup_response(reverse("control:index"), success=False, error_message=msg)
 
         try:
-            event = Event.objects.get(slug=event_slug)
+            event = Event.objects.get(pk=session_data["event_id"])
         except Event.DoesNotExist:
             msg = _("Event not found for OAuth callback.")
+            messages.error(request, msg)
+            return self._popup_response(reverse("control:index"), success=False, error_message=msg)
+
+        if not request.user.has_event_permission(event.organizer, event, "can_change_event_settings", request=request):
+            msg = _("Permission denied for this event.")
             messages.error(request, msg)
             return self._popup_response(reverse("control:index"), success=False, error_message=msg)
 
@@ -173,21 +190,6 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
             messages.error(request, msg)
             return self._popup_response(dashboard_url, success=False, error_message=msg)
 
-        session_data = request.session.pop(f"voxbento_oauth_state:{state}", None)
-        if not session_data:
-            # Fallback for any in-flight attempts using legacy event-scoped key
-            session_data = request.session.pop(f"voxbento_oauth_state:{event.slug}", None)
-
-        if not session_data:
-            msg = _("OAuth authorization failed: Session expired or already consumed.")
-            messages.error(request, msg)
-            return self._popup_response(dashboard_url, success=False, error_message=msg)
-
-        if session_data.get("state") != state or time.time() - session_data.get("timestamp", 0) > 600:
-            msg = _("OAuth authorization failed: Invalid or expired state.")
-            messages.error(request, msg)
-            return self._popup_response(dashboard_url, success=False, error_message=msg)
-
         code = request.GET.get("code")
         if not code:
             msg = _("OAuth authorization failed: No code provided.")
@@ -197,11 +199,6 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
         code_verifier = session_data.get("code_verifier")
         if not code_verifier:
             msg = _("OAuth authorization failed: Missing PKCE code verifier in session.")
-            messages.error(request, msg)
-            return self._popup_response(dashboard_url, success=False, error_message=msg)
-
-        if not request.user.has_event_permission(event.organizer, event, "can_change_event_settings", request=request):
-            msg = _("Permission denied for this event.")
             messages.error(request, msg)
             return self._popup_response(dashboard_url, success=False, error_message=msg)
 
@@ -235,6 +232,7 @@ class VoxbentoOAuthCallbackView(LoginRequiredMixin, View):
                     "code": code,
                     "redirect_uri": redirect_uri,
                     "code_verifier": code_verifier,
+                    "event": event.slug,
                 },
                 timeout=(3.0, 5.0),
             )
